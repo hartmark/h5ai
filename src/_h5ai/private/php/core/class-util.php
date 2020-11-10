@@ -59,16 +59,39 @@ class Util {
         return $rc;
     }
 
-    public static function exec_cmdv($cmdv) {
+    public static function exec_cmdv($cmdv, $capture = false, $redirect = false) {
         if (!is_array($cmdv)) {
             $cmdv = func_get_args();
         }
         $cmd = implode(' ', array_map('escapeshellarg', $cmdv));
 
-        $lines = [];
-        $rc = null;
-        exec($cmd, $lines, $rc);
-        return implode("\n", $lines);
+        if ($redirect) {
+            // Redirects stderr to stdout (notably for ffmpeg)
+            $cmd .= ' 2>&1'; // This cannot be shellarg-escaped
+        }
+        Util::write_log('exec_cmdv:' . $cmd);
+
+        if ($capture){
+            $lines = [];
+            $rc = null;
+            exec($cmd, $lines, $rc);
+            // $strlines = implode("\n", $lines);
+            // Util::write_log('lines:' . $strlines);
+            // return $result;
+            // return implode("\n", $lines);
+            return [implode("\n", $lines), $rc];
+        }
+        exec($cmd);
+    }
+
+    public static function write_log($log_msg, $log_filename = '/ssd_data/shared/_h5ai/public/cache/logs')
+    {
+        if (!file_exists($log_filename))
+        {
+            mkdir($log_filename, 0777, true);
+        }
+        $log_file_data = $log_filename.'/debug.log';
+        file_put_contents($log_file_data, $log_msg . "\n", FILE_APPEND);
     }
 
     public static function exec_0($cmd) {
