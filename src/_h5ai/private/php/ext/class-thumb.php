@@ -30,26 +30,38 @@ class Thumb {
         if (!file_exists($source_path) || Util::starts_with($source_path, $this->setup->get('CACHE_PUB_PATH'))) {
             return null;
         }
-
-        if ($type === 'img') {
-            $capture_path = $source_path;
-        } elseif ($type === 'mov') {
-            if ($this->setup->get('HAS_CMD_AVCONV')) {
-                $capture_path = $this->capture(Thumb::$AVCONV_CMDV, $source_path, $type);
-            } elseif ($this->setup->get('HAS_CMD_FFMPEG')) {
-                $capture_path = $this->capture(Thumb::$FFMPEG_CMDV, $source_path, $type);
+        $types = array('img', 'mov', 'doc');
+        $key = array_search($type, $types);
+        // Only keep the types we won't have tried yet
+        if ($key !== false) unset($types[$key]);
+        $size = count($types);
+        $thumb = null;
+        $attempt = 0;
+        do {
+            if ($type === 'img') {
+                $capture_path = $source_path;
+            } elseif ($type === 'mov') {
+                if ($this->setup->get('HAS_CMD_AVCONV')) {
+                    $capture_path = $this->capture(Thumb::$AVCONV_CMDV, $source_path, $type);
+                } elseif ($this->setup->get('HAS_CMD_FFMPEG')) {
+                    $capture_path = $this->capture(Thumb::$FFMPEG_CMDV, $source_path, $type);
+                }
+            } elseif ($type === 'doc') {
+                if ($this->setup->get('HAS_CMD_CONVERT')) {
+                    $capture_path = $this->capture(Thumb::$CONVERT_CMDV, $source_path, $type);
+                } elseif ($this->setup->get('HAS_CMD_GM')) {
+                    $capture_path = $this->capture(Thumb::$GM_CONVERT_CMDV, $source_path, $type);
+                }
+            } else {
+                $capture_path = $source_path;
             }
-        } elseif ($type === 'doc') {
-            if ($this->setup->get('HAS_CMD_CONVERT')) {
-                $capture_path = $this->capture(Thumb::$CONVERT_CMDV, $source_path, $type);
-            } elseif ($this->setup->get('HAS_CMD_GM')) {
-                $capture_path = $this->capture(Thumb::$GM_CONVERT_CMDV, $source_path, $type);
-            }
-        } else {
-            $capture_path = $source_path;
+            $thumb = $this->thumb_href($capture_path, $width, $height);
+            $type = $types[$attempt];
+            $attempt++;
         }
+        while(is_null($thumb) && $attempt <= $size);
 
-        return $this->thumb_href($capture_path, $width, $height);
+        return $thumb;
     }
 
     private function thumb_href($source_path, $width, $height) {
