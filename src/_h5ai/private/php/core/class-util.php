@@ -71,7 +71,7 @@ class Util {
             $lines = [];
             $rc = null;
             exec($cmd, $lines, $rc);
-            return [implode("\n", $lines), $rc];
+            return [$lines, $rc];
         }
         return exec($cmd);
     }
@@ -90,5 +90,34 @@ class Util {
         $withFoldersize = $context->query_option('foldersize.enabled', false);
         $withDu = $context->get_setup()->get('HAS_CMD_DU') && $context->query_option('foldersize.type', null) === 'shell-du';
         return Filesize::getCachedSize($path, $withFoldersize, $withDu);
+    }
+
+    public static function get_mimetype($source_path) {
+        //return mime_content_type($filename);
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        return $finfo->file($source_path);
+    }
+
+    public static function mime_to_type($mime) {
+        if (strpos($mime, 'image') !== false) {
+            return 'img';
+        }
+        if (strpos($mime, 'video') !== false) {
+            return 'mov';
+        }
+        if (strpos($mime, 'pdf') !== false) {
+            return 'doc';
+        }
+        return false;
+    }
+
+    public static function write_log($log_msg, $log_filename) {
+        if (!file_exists($log_filename))
+        {
+            mkdir($log_filename, 0777, true);
+        }
+        $log_file_data = $log_filename.'/debug.log';
+        $log_msg = date('Y-m-d H:i:s')." ".$log_msg;
+        file_put_contents($log_file_data, $log_msg . "\n", FILE_APPEND);
     }
 }

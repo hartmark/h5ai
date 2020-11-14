@@ -20,13 +20,19 @@ const queueItem = (queue, item) => {
     let type = null;
 
     if (includes(settings.img, item.type)) {
+        console.log("DEBUG: item.type [img] is", item.type, item);
         type = 'img';
     } else if (includes(settings.mov, item.type)) {
+        console.log("DEBUG: item.type [mov] is", item.type, item);
         type = 'mov';
     } else if (includes(settings.doc, item.type)) {
+        console.log("DEBUG: item.type [doc] is", item.type, item);
         type = 'doc';
-    } else {
+    } else if (item.type === 'folder') {
         return;
+    } else {
+        console.log("DEBUG: item.type is", item.type, item);
+        type = 'file'
     }
 
     if (item.thumbSquare) {

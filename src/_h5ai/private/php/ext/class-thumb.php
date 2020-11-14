@@ -14,27 +14,36 @@ class Thumb {
     private $thumbs_path;
     private $thumbs_href;
 
-    public function __construct($context) {
+    public function __construct($context, $source_path, $type) {
         $this->context = $context;
         $this->setup = $context->get_setup();
         $this->thumbs_path = $this->setup->get('CACHE_PUB_PATH') . '/' . Thumb::$THUMB_CACHE;
         $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . Thumb::$THUMB_CACHE;
+        $this->source_path = $source_path;
+        $this->type = $type;
 
         if (!is_dir($this->thumbs_path)) {
             @mkdir($this->thumbs_path, 0755, true);
         }
     }
 
-    public function thumb($type, $source_href, $width, $height) {
-        $source_path = $this->context->to_path($source_href);
+    public function thumb($width, $height) {
+        $source_path = $this->source_path;
+        $type = $this->type;
         if (!file_exists($source_path) || Util::starts_with($source_path, $this->setup->get('CACHE_PUB_PATH'))) {
             return null;
         }
         $types = array('img', 'mov', 'doc');
+        // Only keep the types remaining to test in this array
         $key = array_search($type, $types);
-        // Only keep the types we won't have tried yet
-        if ($key !== false) unset($types[$key]);
+        if ($key !== false) {
+            unset($types[$key]);
+            // Reset indices starting from 0
+            $types = array_values($types);
+        }
+
         $size = count($types);
+        $this->context->write_log("Types".$size." for ".$source_path." of type ".$type." : ".print_r($types, true));
         $thumb = null;
         $attempt = 0;
         do {
@@ -53,19 +62,32 @@ class Thumb {
                     $capture_path = $this->capture(Thumb::$GM_CONVERT_CMDV, $source_path, $type);
                 }
             } else {
-                $capture_path = $source_path;
+                $mimetype = Util::get_mimetype($source_path);
+                $detected_type = Util::mime_to_type($mimetype);
+                $this->context->write_log("\nSource: ".$source_path."\ntype: ".$type."\nmimetype: ".$mimetype."\ndetected: ".$detected_type."\nattempt: ".$attempt."\n");
+                if ($detected_type !== false) {
+                    $type = $detected_type;
+                    continue;
+                }
+                break;
             }
             $thumb = $this->thumb_href($capture_path, $width, $height);
+            if (!is_null($thumb)){
+                $this->type = $type;
+                $this->context->write_log("\nThumb was generated for ". $source_path." and type is indeed: ".$this->type."\n");
+                break;
+            }
             $type = $types[$attempt];
             $attempt++;
-        }
-        while(is_null($thumb) && $attempt <= $size);
+            $this->context->write_log("\nAFTER Source: ".$source_path."\nthumb: ".$thumb."\ntype: ".$type."\nattempt: ".$attempt."\nprevious type from array: ".print_r($types[$attempt - 1], true)."\n");
+        } while(is_null($thumb) /*&& is_null($capture_path)*/ && $attempt <= $size);
 
         return $thumb;
     }
 
     private function thumb_href($source_path, $width, $height) {
         if (!file_exists($source_path)) {
+            // $this->context->write_log("\nthumb_href() file ".$source_path." doesn't exist!\n");
             return null;
         }
 
@@ -126,7 +148,7 @@ class Thumb {
                     $arg = str_replace(['[H5AI_SRC]', '[H5AI_DEST]'], [$source_path, $capture_path], $arg);
                 }
             }
-            Util::exec_cmdv($cmdv);
+            $result = Util::exec_cmdv($cmdv, $movtype);
         }
 
         return file_exists($capture_path) ? $capture_path : null;
@@ -209,6 +231,10 @@ class Image {
     }
 
     public function release_source() {
+        // if (!is_null($this->source_file) && file_exists($this->source_file)) {
+        //     // Capture files tend to be big, save space
+        //     unlink($this->source_file);
+        // }
         if (!is_null($this->source)) {
             @imagedestroy($this->source);
             $this->source_file = null;
