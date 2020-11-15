@@ -255,7 +255,7 @@ class Context {
     }
 
     public function write_log($msg){
-        Util::write_log($msg, $this->setup->get('CACHE_PRV_PATH'));
+        Util::write_log($msg, $this->setup->get('PRIVATE_PATH'));
     }
 
     private function prefix_x_head_href($href) {
