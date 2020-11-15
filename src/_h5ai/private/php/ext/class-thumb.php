@@ -43,7 +43,7 @@ class Thumb {
         }
 
         $size = count($types);
-        $this->context->write_log("Types".$size." for ".$source_path." of type ".$type." : ".print_r($types, true));
+        // $this->context->write_log("Types".$size." for ".$source_path." of type ".$type." : ".print_r($types, true));
         $thumb = null;
         $attempt = 0;
         do {
@@ -61,7 +61,7 @@ class Thumb {
                 } elseif ($this->setup->get('HAS_CMD_GM')) {
                     $capture_path = $this->capture(Thumb::$GM_CONVERT_CMDV, $source_path, $type);
                 }
-            } else {
+            } elseif ($this->setup->get('HAS_PHP_FILEINFO')) {
                 $mimetype = Util::get_mimetype($source_path);
                 $detected_type = Util::mime_to_type($mimetype);
                 $this->context->write_log("\nSource: ".$source_path."\ntype: ".$type."\nmimetype: ".$mimetype."\ndetected: ".$detected_type."\nattempt: ".$attempt."\n");
@@ -70,6 +70,8 @@ class Thumb {
                     continue;
                 }
                 break;
+            } else {
+                return null;
             }
             $thumb = $this->thumb_href($capture_path, $width, $height);
             if (!is_null($thumb)){
@@ -117,7 +119,7 @@ class Thumb {
         return file_exists($thumb_path) ? $thumb_href : null;
     }
 
-    private function capture($cmdv, $source_path, $type) {
+    private function capture($cmdv, $source_path, $type, $in_memory = true) {
         if (!file_exists($source_path)) {
             return null;
         }

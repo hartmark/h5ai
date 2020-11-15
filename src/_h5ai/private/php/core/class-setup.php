@@ -66,6 +66,12 @@ class Setup {
             $has_php_jpeg = array_key_exists('JPEG Support', $infos) && $infos['JPEG Support'];
         }
         $this->set('HAS_PHP_JPEG', $has_php_jpeg);
+
+        $has_fileinfo = false;
+        if (extension_loaded('fileinfo')){
+            $has_fileinfo = true;
+        }
+        $this->set('HAS_PHP_FILEINFO', $has_fileinfo);
     }
 
     private function add_app_metadata() {
@@ -156,6 +162,7 @@ class Setup {
                 'PHP_ARCH',
                 'HAS_PHP_EXIF',
                 'HAS_PHP_JPEG',
+                'HAS_PHP_FILEINFO',
 
                 'SERVER_NAME',
                 'SERVER_VERSION',
