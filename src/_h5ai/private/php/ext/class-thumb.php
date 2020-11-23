@@ -1,18 +1,20 @@
 <?php
 
 class Thumb {
-    private static $FFMPEG_CMDV = ['ffmpeg', '-nostdin', '-y', '-hide_banner', '-ss', '[DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '[H5AI_DEST]'];
-    private static $FFPROBE_CMDV = ['ffprobe', '-v', 'quiet', '-show_format_entry', 'duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
-    private static $AVCONV_CMDV = ['avconv', '-nostdin', '-y', '-hide_banner', '-ss', '[DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '[H5AI_DEST]'];
-    private static $AVPROBE_CMDV = ['avprobe', '-v', 'quiet', '-show_format_entry', 'duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
-    private static $CONVERT_CMDV = ['convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', '[H5AI_DEST]'];
-    private static $GM_CONVERT_CMDV = ['gm', 'convert', '-density', '200', '-quality', '100', '[H5AI_SRC][0]', '[H5AI_DEST]'];
+    private static $FFMPEG_CMDV = ['ffmpeg', '-v', 'warning', '-nostdin', '-y', '-hide_banner', '-ss', '[H5AI_DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '-f', 'image2', '-'];
+    private static $FFPROBE_CMDV = ['ffprobe', '-v', 'warning', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
+    private static $AVCONV_CMDV = ['avconv', '-v', 'warning', '-nostdin', '-y', '-hide_banner', '-ss', '[H5AI_DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '-f', 'image2', '-'];
+    private static $AVPROBE_CMDV = ['avprobe', '-v', 'warning', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
+    private static $CONVERT_CMDV = ['convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
+    private static $GM_CONVERT_CMDV = ['gm', 'convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
     private static $THUMB_CACHE = 'thumbs';
 
     private $context;
     private $setup;
     private $thumbs_path;
     private $thumbs_href;
+    private $capture_data;
+    private $image;
 
     public function __construct($context, $source_path, $type) {
         $this->context = $context;
@@ -21,6 +23,11 @@ class Thumb {
         $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . Thumb::$THUMB_CACHE;
         $this->source_path = $source_path;
         $this->type = $type;
+        $this->source_hash = sha1($source_path);
+        $this->capture_data = null;
+        $this->thumb_path = null;
+        $this->thumb_href = null;
+        $this->image = null;
 
         if (!is_dir($this->thumbs_path)) {
             @mkdir($this->thumbs_path, 0755, true);
@@ -28,12 +35,26 @@ class Thumb {
     }
 
     public function thumb($width, $height) {
-        $source_path = $this->source_path;
-        $type = $this->type;
-        if (!file_exists($source_path) || Util::starts_with($source_path, $this->setup->get('CACHE_PUB_PATH'))) {
+        if (!file_exists($this->source_path) || Util::starts_with($this->source_path, $this->setup->get('CACHE_PUB_PATH'))) {
             return null;
         }
-        $types = array('img', 'mov', 'doc');
+        $name = 'thumb-' . $this->source_hash . '-' . $width . 'x' . $height . '.jpg';
+        $this->thumb_path = $this->thumbs_path . '/' . $name;
+        $this->thumb_href = $this->thumbs_href . '/' . $name;
+
+        if (file_exists($this->thumb_path) && filemtime($this->source_path) <= filemtime($this->thumb_path)) {
+            if ($this->type === 'file') {
+                // This was previously detected as able to generate thumbnail 
+                $this->type = 'done';
+            }
+            return $this->thumb_href;
+        }
+        if (!empty($this->capture_data)) {
+            return $this->thumb_href($width, $height);
+        }
+
+        $type = $this->type;
+        $types = array('img', 'mov', 'doc', 'swf');
         // Only keep the types remaining to test in this array
         $key = array_search($type, $types);
         if ($key !== false) {
@@ -41,132 +62,174 @@ class Thumb {
             // Reset indices starting from 0
             $types = array_values($types);
         }
-
-        $size = count($types);
-        // $this->context->write_log("Types".$size." for ".$source_path." of type ".$type." : ".print_r($types, true));
+        $types_count = count($types);
+        // $this->context->write_log("Types".$types_count." for ".$this->source_path." of type ".$type." : ".print_r($types, true));
         $thumb = null;
         $attempt = 0;
         do {
+            $this->context->write_log("\nDO: ".$this->source_path."\ntype: ".$type."\nattempt: ".$attempt."\n");
             if ($type === 'img') {
-                $capture_path = $source_path;
-            } elseif ($type === 'mov') {
-                if ($this->setup->get('HAS_CMD_AVCONV')) {
-                    $capture_path = $this->capture(Thumb::$AVCONV_CMDV, $source_path, $type);
-                } elseif ($this->setup->get('HAS_CMD_FFMPEG')) {
-                    $capture_path = $this->capture(Thumb::$FFMPEG_CMDV, $source_path, $type);
+                $thumb = $this->thumb_href($width, $height);
+                if (!is_null($thumb)) {
+                    $this->type = $type;
+                    // Avoid future type detection if we have generated a valid one already
+                    $this->capture_data = "_";
+                    break;
                 }
-            } elseif ($type === 'doc') {
-                if ($this->setup->get('HAS_CMD_CONVERT')) {
-                    $capture_path = $this->capture(Thumb::$CONVERT_CMDV, $source_path, $type);
-                } elseif ($this->setup->get('HAS_CMD_GM')) {
-                    $capture_path = $this->capture(Thumb::$GM_CONVERT_CMDV, $source_path, $type);
+            }
+            elseif (($type === 'mov') || ($type === 'swf')) {
+                try {
+                    if ($this->setup->get('HAS_CMD_AVCONV')) {
+                        $this->capture(Thumb::$AVCONV_CMDV, $type);
+                    } elseif ($this->setup->get('HAS_CMD_FFMPEG')) {
+                        $this->capture(Thumb::$FFMPEG_CMDV, $type);
+                    }
+                } catch (Exception $e) {
+                    $this->context->write_log($e);
                 }
-            } elseif ($this->setup->get('HAS_PHP_FILEINFO')) {
-                $mimetype = Util::get_mimetype($source_path);
-                $detected_type = Util::mime_to_type($mimetype);
-                $this->context->write_log("\nSource: ".$source_path."\ntype: ".$type."\nmimetype: ".$mimetype."\ndetected: ".$detected_type."\nattempt: ".$attempt."\n");
-                if ($detected_type !== false) {
-                    $type = $detected_type;
-                    continue;
+            }
+            elseif ($type === 'doc') {
+                try {
+                    if ($this->setup->get('HAS_CMD_CONVERT')) {
+                        $this->capture(Thumb::$CONVERT_CMDV, $type);
+                    } elseif ($this->setup->get('HAS_CMD_GM')) {
+                        $this->capture(Thumb::$GM_CONVERT_CMDV, $type);
+                    }
+                } catch (Exception $e) {
+                    $this->context->write_log($e);
                 }
-                break;
-            } else {
+            }
+            elseif ($this->setup->get('HAS_PHP_FILEINFO')) {
+                // Last resort, we check the magic number
+                $type = Util::mime_to_type(Util::get_mimetype($this->source_path));
+                $this->context->write_log("\nDETECT: ".$this->source_path."\ntype: ".$type."\nattempt: ".$attempt."\n");
+                if ($type === 'file') {
+                    // No further try after this
+                    $this->type = $type;
+                    break;
+                }
+                continue;
+            }
+            else {
                 return null;
             }
-            $thumb = $this->thumb_href($capture_path, $width, $height);
-            if (!is_null($thumb)){
+            if (!empty($this->capture_data) && is_null($thumb)) {
+                $thumb = $this->thumb_href($width, $height);
+            }
+
+            if (!is_null($thumb)) {
+                // Validate the type
                 $this->type = $type;
-                $this->context->write_log("\nThumb was generated for ". $source_path." and type is indeed: ".$this->type."\n");
+                $this->context->write_log("\nThumb was generated for ". $this->source_path." and type is indeed: ".$this->type."\n");
                 break;
             }
+            // Get the next type to try
             $type = $types[$attempt];
             $attempt++;
-            $this->context->write_log("\nAFTER Source: ".$source_path."\nthumb: ".$thumb."\ntype: ".$type."\nattempt: ".$attempt."\nprevious type from array: ".print_r($types[$attempt - 1], true)."\n");
-        } while(is_null($thumb) /*&& is_null($capture_path)*/ && $attempt <= $size);
+            $this->context->write_log("\nattempt++ Source: ".$this->source_path."\nthumb: ".$thumb."\ntype: ".$type."\nattempt: ".$attempt."/".$types_count."\nprevious type from array: ".print_r($types[$attempt - 1], true)."\n");
+        } while(is_null($thumb) && empty($this->capture_data) && $attempt < $types_count);
 
         return $thumb;
     }
 
-    private function thumb_href($source_path, $width, $height) {
-        if (!file_exists($source_path)) {
-            // $this->context->write_log("\nthumb_href() file ".$source_path." doesn't exist!\n");
-            return null;
-        }
+    private function thumb_href($width, $height) {
+        // $image =& $this->image;
+        if ($this->image === null) {
+            $this->image = new Image();
 
-        $name = 'thumb-' . sha1($source_path) . '-' . $width . 'x' . $height . '.jpg';
-        $thumb_path = $this->thumbs_path . '/' . $name;
-        $thumb_href = $this->thumbs_href . '/' . $name;
-
-        if (!file_exists($thumb_path) || filemtime($source_path) >= filemtime($thumb_path)) {
-            $image = new Image();
-
-            $et = false;
-            if ($this->setup->get('HAS_PHP_EXIF') && $this->context->query_option('thumbnails.exif', false) === true && $height != 0) {
-                $et = @exif_thumbnail($source_path);
-            }
-            if($et !== false) {
-                file_put_contents($thumb_path, $et);
-                $image->set_source($thumb_path);
-                $image->normalize_exif_orientation($source_path);
+            if (empty($this->capture_data)) {
+                // We assume $this->source_path points to an image file
+                $et = false;
+                if ($this->setup->get('HAS_PHP_EXIF') && $this->context->query_option('thumbnails.exif', false) === true && $height != 0) {
+                    $et = @exif_thumbnail($this->source_path);
+                }
+                if($et !== false) {
+                    //FIXME keep the handle and pass it to $image instead of closing it here
+                    file_put_contents($this->thumb_path, $et);
+                    $this->image->set_source($this->thumb_path);
+                    $this->image->normalize_exif_orientation($this->source_path);
+                } else {
+                    $this->image->set_source($this->source_path);
+                }
             } else {
-                $image->set_source($source_path);
+                $this->image->set_source_data($this->capture_data);
             }
-
-            $image->thumb($width, $height);
-            $image->save_dest_jpeg($thumb_path, 80);
         }
+        $this->image->thumb($width, $height);
+        $this->image->save_dest_jpeg($this->thumb_path, 80);
 
-        return file_exists($thumb_path) ? $thumb_href : null;
+        if (file_exists($this->thumb_path)) {
+            // Cache it for further requests
+            // $this->image = &$image;
+            return $this->thumb_href;
+        }
+        // return file_exists($this->thumb_path) ? $this->thumb_href : null;
+        unset($this->image);
+        $this->image = null;
+        return null;
     }
 
-    private function capture($cmdv, $source_path, $type, $in_memory = true) {
-        if (!file_exists($source_path)) {
-            return null;
-        }
-
-        $capture_path = $this->thumbs_path . '/capture-' . sha1($source_path) . '.jpg';
-
-        if (!file_exists($capture_path) || filemtime($source_path) >= filemtime($capture_path)) {
-            $movtype = ($type === 'mov') ? true : false;
-            if ($movtype) {
-                // Attempt to capture after the first second anyway
-                $timestamp = 1;
-                if ($cmdv[0] === 'ffmpeg') {
-                    $timestamp = $this->compute_duration(Thumb::$FFPROBE_CMDV, $source_path);
-                } else {
-                    $timestamp = $this->compute_duration(Thumb::$AVPROBE_CMDV, $source_path);
-                }
-
-                foreach ($cmdv as &$arg) {
-                    $arg = str_replace(
-                        ['[H5AI_SRC]', '[H5AI_DEST]', '[DUR]'],
-                        [$source_path, $capture_path, $timestamp],
-                        $arg
-                    );
-                }
+    private function capture($cmdv, $type) {
+        if ($type === 'doc') {
+            foreach ($cmdv as &$arg) {
+                $arg = str_replace('[H5AI_SRC]', $this->source_path, $arg);
             }
-            else {
-                foreach ($cmdv as &$arg) {
-                    $arg = str_replace(['[H5AI_SRC]', '[H5AI_DEST]'], [$source_path, $capture_path], $arg);
-                }
+        } else {
+            $timestamp = '0.1';
+            if ($cmdv[0] === 'ffmpeg') {
+                $timestamp = $this->compute_duration(Thumb::$FFPROBE_CMDV, $this->source_path);
+            } else {
+                $timestamp = $this->compute_duration(Thumb::$AVPROBE_CMDV, $this->source_path);
             }
-            $result = Util::exec_cmdv($cmdv, $movtype);
-        }
 
-        return file_exists($capture_path) ? $capture_path : null;
+            // Seeking should be done after decoding
+            if ($type === 'swf'){
+                $cmdv[6] = '-i';
+                $cmdv[7] = '[H5AI_SRC]';
+                $cmdv[8] = '-ss';
+                $cmdv[9] = '[H5AI_DUR]';
+            }
+            foreach ($cmdv as &$arg) {
+                $arg = str_replace(
+                    ['[H5AI_SRC]', '[H5AI_DUR]'],
+                    [$this->source_path, $timestamp],
+                    $arg
+                );
+            }
+        }
+        $error = null;
+        $exit = Util::proc_open_cmdv($cmdv, $this->capture_data, $error);
+        $this->context->write_log($this->source_path." capture_data is: ".(empty($this->capture_data) ? 'EMPTY' : 'NOT EMPTY')." cmdv: ".implode(" ", $cmdv));
+        if (!empty($this->capture_data) && $type === 'doc') {
+            // $img = imagecreatefromstring($this->capture_data);
+            // $this->context->write_log($this->source_path." DATA CAPTURE: ".$this->capture_data);
+            // $filename = $this->setup->get('CACHE_PUB_PATH').'/'.sha1($this->source_path);
+            // imagejpeg($img, $filename, 50);
+            // $fp = fopen($filename, 'w');
+            // fwrite($fp, $this->capture_data);
+            // fclose($fp);
+            // @chmod($filename, 0775);
+            return True;
+        }
+        return False;
     }
 
     private function compute_duration($cmdv, $source_path) {
         foreach ($cmdv as &$arg) {
             $arg = str_replace('[H5AI_SRC]', $source_path, $arg);
         }
-        $result = Util::exec_cmdv($cmdv);
-        if (empty($result) || !is_numeric($result) || is_infinite($result)) {
-            // Force seeking at 1 second in
-            return "1";
+
+        $output = null;
+        $error = null;
+        $exit = Util::proc_open_cmdv($cmdv, $output, $error);
+        if (empty($output) || !is_numeric($output) || is_infinite($output)) {
+            if (!empty($error) && strpos($error, 'misdetection possible') !== false) {
+                throw new Exception($error);
+            }
+            return '0.1';
         }
         // Seek at 15% of the total video duration
-        return strval(round(((floatval($result) * 15) / 100), 1, PHP_ROUND_HALF_UP));
+        return strval(round(((floatval($output) * 15) / 100), 1, PHP_ROUND_HALF_UP));
     }
 }
 
@@ -202,7 +265,6 @@ class Image {
         if (is_null($filename)) {
             return;
         }
-
         $this->source_file = $filename;
 
         list($this->width, $this->height, $this->type) = @getimagesize($this->source_file);
@@ -218,7 +280,36 @@ class Image {
         $this->source = imagecreatefromstring(file_get_contents($this->source_file));
     }
 
+    public function set_source_data($data) {
+        $this->release_dest();
+
+        $fiveMBs = 2 * 1024 * 1024;
+        $fp = fopen("php://temp/maxmemory:$fiveMBs", 'r+');
+        fwrite($fp, $data);
+        $this->source_file = $fp;
+        rewind($fp);
+        $this->source = imagecreatefromstring(stream_get_contents($fp));
+        fclose($fp);
+
+        // $this->source = imagecreatefromstring($data);
+        Util::write_log("\nDATA: ".$this->source_file." ".$this->source);
+
+        $this->width = imagesx($this->source);
+        $this->height = imagesy($this->source);
+        $this->type = null;
+
+        if (!$this->width || !$this->height) {
+            $this->source_file = null;
+            $this->width = null;
+            $this->height = null;
+            $this->type = null;
+            return;
+        }
+
+    }
+
     public function save_dest_jpeg($filename, $quality = 80) {
+        Util::write_log("\nSAVE_DEST: ".$this->source_file." to ".$filename);
         if (!is_null($this->dest)) {
             @imagejpeg($this->dest, $filename, $quality);
             @chmod($filename, 0775);
@@ -233,10 +324,6 @@ class Image {
     }
 
     public function release_source() {
-        // if (!is_null($this->source_file) && file_exists($this->source_file)) {
-        //     // Capture files tend to be big, save space
-        //     unlink($this->source_file);
-        // }
         if (!is_null($this->source)) {
             @imagedestroy($this->source);
             $this->source_file = null;
@@ -296,6 +383,7 @@ class Image {
             return;
         }
 
+        //FIXME once rotated, prevent further rotations since we keep $this->source in memory
         $this->source = imagerotate($this->source, $angle, 0);
         if ( $angle === 90 || $angle === 270 ) {
             list($this->width, $this->height) = [$this->height, $this->width];

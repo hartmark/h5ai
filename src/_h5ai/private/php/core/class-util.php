@@ -86,6 +86,32 @@ class Util {
         return false;
     }
 
+    public static function proc_open_cmdv($cmdv, &$output, &$error) {
+        $cmd = implode(' ', array_map('escapeshellarg', $cmdv));
+
+        $descriptorspec = array(
+            0 => array("pipe", "r"),  // stdin is a pipe that the child will read from
+            1 => array("pipe", "w"),  // stdout is a pipe that the child will write to
+            2 => array("pipe", "w")   // stderr is a pipe the child will write to
+        );
+        $process = proc_open($cmd, $descriptorspec, $pipes);
+
+        if (is_resource($process)) {
+            /*fwrite($pipes[0], '');*/
+            fclose($pipes[0]);
+
+            $output = stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+
+            $error = stream_get_contents($pipes[2]);
+            // fclose($pipe[2]);
+
+            $exit_code = proc_close($process);
+            return $exit_code;
+        }
+        return -1;
+    }
+
     public static function filesize($context, $path) {
         $withFoldersize = $context->query_option('foldersize.enabled', false);
         $withDu = $context->get_setup()->get('HAS_CMD_DU') && $context->query_option('foldersize.type', null) === 'shell-du';
@@ -108,7 +134,10 @@ class Util {
         if (strpos($mime, 'pdf') !== false) {
             return 'doc';
         }
-        return false;
+        if (strpos($mime, 'flash') !== false) {
+            return 'swf';
+        }
+        return 'file';
     }
 
     public static function write_log($log_msg, $log_filename) {

@@ -245,6 +245,7 @@ class Context {
             }
             else if ($thumbs[$href]->type === 'file') {
                 // File has already been mime tested and cannot have a thumbnail
+                // $this->write_log($href." FLAGGED as FILE. Skipping.");
                 $hrefs[] = null;
                 continue;
             }
