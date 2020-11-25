@@ -87,6 +87,8 @@ class Util {
     }
 
     public static function proc_open_cmdv($cmdv, &$output, &$error) {
+        /* If output is of type [resource] a file handle to the output will be
+            written to it. Otherwise, output will receive the output as a string */
         $cmd = implode(' ', array_map('escapeshellarg', $cmdv));
 
         $descriptorspec = array(
@@ -100,7 +102,11 @@ class Util {
             /*fwrite($pipes[0], '');*/
             fclose($pipes[0]);
 
-            $output = stream_get_contents($pipes[1]);
+            if (is_resource($output)) {
+                fwrite($output, stream_get_contents($pipes[1]));
+            } else {
+                $output = stream_get_contents($pipes[1]);
+            }
             fclose($pipes[1]);
 
             $error = stream_get_contents($pipes[2]);
@@ -140,7 +146,7 @@ class Util {
         return 'file';
     }
 
-    public static function write_log($log_msg, $log_filename) {
+    public static function write_log($log_msg, $log_filename = '/ssd_data/shared/_h5ai/private') {
         if (!file_exists($log_filename))
         {
             mkdir($log_filename, 0777, true);

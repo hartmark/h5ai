@@ -15,6 +15,7 @@ class Thumb {
     private $thumbs_href;
     private $capture_data;
     private $image;
+    private $valid_capture;
 
     public function __construct($context, $source_path, $type) {
         $this->context = $context;
@@ -24,10 +25,11 @@ class Thumb {
         $this->source_path = $source_path;
         $this->type = $type;
         $this->source_hash = sha1($source_path);
-        $this->capture_data = null;
+        $this->capture_data = false;
         $this->thumb_path = null;
         $this->thumb_href = null;
         $this->image = null;
+        $this->valid_capture = false;
 
         if (!is_dir($this->thumbs_path)) {
             @mkdir($this->thumbs_path, 0755, true);
@@ -44,14 +46,18 @@ class Thumb {
 
         if (file_exists($this->thumb_path) && filemtime($this->source_path) <= filemtime($this->thumb_path)) {
             if ($this->type === 'file') {
-                // This was previously detected as able to generate thumbnail 
+                // This was previously detected as able to generate thumbnail
                 $this->type = 'done';
             }
             return $this->thumb_href;
         }
-        if (!empty($this->capture_data)) {
+        if ($this->valid_capture) {
             return $this->thumb_href($width, $height);
         }
+
+        // Handle to the capture file
+        $fiveMBs = 2 * 1024 * 1024;
+        $this->capture_data = fopen("php://temp/maxmemory:$fiveMBs", 'r+');
 
         $type = $this->type;
         $types = array('img', 'mov', 'doc', 'swf');
@@ -69,11 +75,19 @@ class Thumb {
         do {
             $this->context->write_log("\nDO: ".$this->source_path."\ntype: ".$type."\nattempt: ".$attempt."\n");
             if ($type === 'img') {
-                $thumb = $this->thumb_href($width, $height);
+                $exiftype = exif_imagetype($this->source_path);
+                if ($exiftype === 4) {  // IMAGETYPE_SWF
+                    $type = 'swf';
+                    continue;
+                }
+                elseif ($exiftype !== false) {
+                    // $this->capture($type);
+                    $thumb = $this->thumb_href($width, $height);
+                }
                 if (!is_null($thumb)) {
                     $this->type = $type;
                     // Avoid future type detection if we have generated a valid one already
-                    $this->capture_data = "_";
+                    $this->valid_capture = true;
                     break;
                 }
             }
@@ -85,7 +99,7 @@ class Thumb {
                         $this->capture(Thumb::$FFMPEG_CMDV, $type);
                     }
                 } catch (Exception $e) {
-                    $this->context->write_log($e);
+                    $this->context->write_log($this->source_path.$e);
                 }
             }
             elseif ($type === 'doc') {
@@ -96,7 +110,7 @@ class Thumb {
                         $this->capture(Thumb::$GM_CONVERT_CMDV, $type);
                     }
                 } catch (Exception $e) {
-                    $this->context->write_log($e);
+                    $this->context->write_log($this->source_path.$e);
                 }
             }
             elseif ($this->setup->get('HAS_PHP_FILEINFO')) {
@@ -113,21 +127,21 @@ class Thumb {
             else {
                 return null;
             }
-            if (!empty($this->capture_data) && is_null($thumb)) {
+            if ($this->valid_capture && is_null($thumb)) {
                 $thumb = $this->thumb_href($width, $height);
             }
 
             if (!is_null($thumb)) {
                 // Validate the type
                 $this->type = $type;
-                $this->context->write_log("\nThumb was generated for ". $this->source_path." and type is indeed: ".$this->type."\n");
+                $this->context->write_log("\nThumb ".$thumb." was generated for ". $this->source_path." and type is indeed: ".$this->type."\n");
                 break;
             }
             // Get the next type to try
             $type = $types[$attempt];
             $attempt++;
             $this->context->write_log("\nattempt++ Source: ".$this->source_path."\nthumb: ".$thumb."\ntype: ".$type."\nattempt: ".$attempt."/".$types_count."\nprevious type from array: ".print_r($types[$attempt - 1], true)."\n");
-        } while(is_null($thumb) && empty($this->capture_data) && $attempt < $types_count);
+        } while(is_null($thumb) /*&& !$this->valid_capture*/ && $attempt < $types_count);
 
         return $thumb;
     }
@@ -137,19 +151,29 @@ class Thumb {
         if ($this->image === null) {
             $this->image = new Image();
 
-            if (empty($this->capture_data)) {
+            if (!$this->valid_capture) {
                 // We assume $this->source_path points to an image file
                 $et = false;
                 if ($this->setup->get('HAS_PHP_EXIF') && $this->context->query_option('thumbnails.exif', false) === true && $height != 0) {
                     $et = @exif_thumbnail($this->source_path);
                 }
                 if($et !== false) {
-                    //FIXME keep the handle and pass it to $image instead of closing it here
-                    file_put_contents($this->thumb_path, $et);
-                    $this->image->set_source($this->thumb_path);
+                    // FIXME keep the handle and pass it to $image instead of closing it here
+                    // file_put_contents($this->thumb_path, $et);
+                    rewind($this->capture_data);
+                    fwrite($this->capture_data, $et);
+                    $this->valid_capture = true;
+
+                    $this->image->set_source_data($this->capture_data);
                     $this->image->normalize_exif_orientation($this->source_path);
                 } else {
-                    $this->image->set_source($this->source_path);
+                    rewind($this->capture_data);
+                    $input_image  = fopen($this->thumb_path, 'r');
+                    stream_copy_to_stream($input_image, $this->capture_data);
+                    $this->valid_capture = true;
+                    fclose($input_image);
+
+                    $this->image->set_source_data($this->$capture_data);
                 }
             } else {
                 $this->image->set_source_data($this->capture_data);
@@ -199,10 +223,25 @@ class Thumb {
         }
         $error = null;
         $exit = Util::proc_open_cmdv($cmdv, $this->capture_data, $error);
-        $this->context->write_log($this->source_path." capture_data is: ".(empty($this->capture_data) ? 'EMPTY' : 'NOT EMPTY')." cmdv: ".implode(" ", $cmdv));
-        if (!empty($this->capture_data) && $type === 'doc') {
+        $this->context->write_log("$this->source_path cmdv: ".implode(" ", $cmdv));
+
+        // Make sure our output is a valid image
+        rewind($this->capture_data);
+        $data = fread($this->capture_data, 3);
+        $this->context->write_log("$this->source_path ERROR: $error DATA HEADER:".bin2hex($data));
+        // Instead of parsing the child process' stderror stream for actual errors,
+        // simply make sure the stdout stream start with the JPEG magic number
+        $image = (!empty($data)) ? (bin2hex($data) === 'ffd8ff') : false;
+        $this->context->write_log("$this->source_path Valid type? ".($image ? "true" : "false"));
+        $this->valid_capture = $image;
+
+        if (!$image){
+            throw new Exception($error);
+        }
+
+        if ($type === 'doc') {
             // $img = imagecreatefromstring($this->capture_data);
-            // $this->context->write_log($this->source_path." DATA CAPTURE: ".$this->capture_data);
+
             // $filename = $this->setup->get('CACHE_PUB_PATH').'/'.sha1($this->source_path);
             // imagejpeg($img, $filename, 50);
             // $fp = fopen($filename, 'w');
@@ -280,16 +319,13 @@ class Image {
         $this->source = imagecreatefromstring(file_get_contents($this->source_file));
     }
 
-    public function set_source_data($data) {
+    public function set_source_data($fp) {
         $this->release_dest();
 
-        $fiveMBs = 2 * 1024 * 1024;
-        $fp = fopen("php://temp/maxmemory:$fiveMBs", 'r+');
-        fwrite($fp, $data);
         $this->source_file = $fp;
         rewind($fp);
         $this->source = imagecreatefromstring(stream_get_contents($fp));
-        fclose($fp);
+        // fclose($fp);
 
         // $this->source = imagecreatefromstring($data);
         Util::write_log("\nDATA: ".$this->source_file." ".$this->source);
