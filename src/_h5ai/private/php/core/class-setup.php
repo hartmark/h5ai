@@ -67,11 +67,7 @@ class Setup {
         }
         $this->set('HAS_PHP_JPEG', $has_php_jpeg);
 
-        $has_fileinfo = false;
-        if (extension_loaded('fileinfo')){
-            $has_fileinfo = true;
-        }
-        $this->set('HAS_PHP_FILEINFO', $has_fileinfo);
+        $this->set('HAS_PHP_FILEINFO', extension_loaded('fileinfo'));
     }
 
     private function add_app_metadata() {
