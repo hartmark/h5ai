@@ -8,6 +8,8 @@ class Util {
     const ERR_UNSUPPORTED = 'ERR_UNSUPPORTED';
     const NO_DEFAULT = 'NO_*@+#?!_DEFAULT';
     const RE_DELIMITER = '@';
+    // 'file' has to be the last item!
+    public const AVAILABLE_TYPES = ['img', 'mov', 'doc', 'swf', 'file'];
 
     public static function normalize_path($path, $trailing_slash = false) {
         $path = preg_replace('#[\\\\/]+#', '/', $path);
@@ -87,8 +89,6 @@ class Util {
     }
 
     public static function proc_open_cmdv($cmdv, &$output, &$error) {
-        /* If output is of type [resource] a file handle to the output will be
-            written to it. Otherwise, output will receive the output as a string */
         $cmd = implode(' ', array_map('escapeshellarg', $cmdv));
 
         $descriptorspec = array(
@@ -99,18 +99,17 @@ class Util {
         $process = proc_open($cmd, $descriptorspec, $pipes);
 
         if (is_resource($process)) {
-            /*fwrite($pipes[0], '');*/
-            fclose($pipes[0]);
+            fclose($pipes[0]);  // We usually don't need stdin
 
             if (is_resource($output)) {
-                fwrite($output, stream_get_contents($pipes[1]));
+                stream_copy_to_stream($pipes[1], $output);
             } else {
                 $output = stream_get_contents($pipes[1]);
             }
             fclose($pipes[1]);
 
             $error = stream_get_contents($pipes[2]);
-            // fclose($pipe[2]);
+            fclose($pipes[2]);
 
             $exit_code = proc_close($process);
             return $exit_code;
@@ -146,13 +145,14 @@ class Util {
         return 'file';
     }
 
-    public static function write_log($log_msg, $log_filename = '/ssd_data/shared/_h5ai/private') {
-        if (!file_exists($log_filename))
-        {
-            mkdir($log_filename, 0777, true);
+    public static function get_types_array($type) {
+        /* Returns an array of possible types, with $type as the first element*/
+        $types = Util::AVAILABLE_TYPES;
+        $key = array_search($type, $types);
+        if ($key !== false) {
+            unset($types[$key]);
+            array_unshift($types, $type);
         }
-        $log_file_data = $log_filename.'/debug.log';
-        $log_msg = date('Y-m-d H:i:s')." ".$log_msg;
-        file_put_contents($log_file_data, $log_msg . "\n", FILE_APPEND);
+        return $types;
     }
 }

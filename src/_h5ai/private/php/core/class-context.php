@@ -245,18 +245,12 @@ class Context {
             }
             else if ($thumbs[$href]->type === 'file') {
                 // File has already been mime tested and cannot have a thumbnail
-                // $this->write_log($href." FLAGGED as FILE. Skipping.");
                 $hrefs[] = null;
                 continue;
             }
             $hrefs[] = $thumbs[$href]->thumb($req['width'], $req['height']);
         }
-
         return $hrefs;
-    }
-
-    public function write_log($msg){
-        Util::write_log($msg, $this->setup->get('PRIVATE_PATH'));
     }
 
     private function prefix_x_head_href($href) {
