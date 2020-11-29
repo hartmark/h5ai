@@ -274,8 +274,13 @@ class Thumb {
             }
             return '0.1';
         }
-        // Seek at 15% of the total video duration
-        return strval(round(((floatval($output) * 15) / 100), 1, PHP_ROUND_HALF_UP));
+        // Seek at user-defined percentage of the total video duration
+        return strval(
+            round(
+            (floatval($duration) *
+            floatval($this->context->query_option('thumbnails.seek', 50)) / 100),
+            1, PHP_ROUND_HALF_UP)
+        );
     }
 }
 
