@@ -80,7 +80,7 @@ class Thumb {
                 return $thumb_href;
             }
         }
-        return null;
+        return $thumb_href;
     }
 
     private function thumb_href($width, $height) {
@@ -168,10 +168,10 @@ class Thumb {
         }
         else if ($type === 'doc') {
             try {
-                if ($this->setup->get('HAS_CMD_CONVERT')) {
-                    $this->do_capture(self::$CONVERT_CMDV);
-                } elseif ($this->setup->get('HAS_CMD_GM')) {
-                    $this->do_capture(self::$GM_CONVERT_CMDV);
+                if ($this->setup->get('HAS_CMD_GM')) {
+                    return $this->do_capture(self::$GM_CONVERT_CMDV);
+                } else if ($this->setup->get('HAS_CMD_CONVERT')) {
+                    return $this->do_capture(self::$CONVERT_CMDV);
                 } else {
                     return false;
                 }
