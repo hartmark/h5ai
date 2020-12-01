@@ -140,6 +140,10 @@ const setLocation = (newAbsHref, keepBrowserUrl) => {
             item.isLoaded = true;
             notification.set();
             event.pub('location.changed', item);
+        }).then(() => {
+            let images = document.querySelectorAll(".item.file");
+            console.log("LAZY LOAD loaded: ", images);
+            lazyload(images);
         });
     }
 };
