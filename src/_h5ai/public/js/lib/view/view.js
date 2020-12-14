@@ -6,6 +6,7 @@ const resource = require('../core/resource');
 const store = require('../core/store');
 const allsettings = require('../core/settings');
 const base = require('./base');
+// const item = require('../model/item');
 
 const modes = ['details', 'grid', 'icons'];
 const sizes = [20, 40, 60, 80, 100, 150, 200, 250, 300, 350, 400];
@@ -23,6 +24,7 @@ const checkedModes = intersection(settings.modes, modes);
 const storekey = 'view';
 const viewTpl =
         `<div id="view">
+            <div id="pagination_top" class="nav_buttons"></div>
             <ul id="items" class="clearfix">
                 <li class="header">
                     <a class="icon"></a>
@@ -32,6 +34,7 @@ const viewTpl =
                 </li>
             </ul>
             <div id="view-hint"></div>
+            <div id="pagination_btm" class="nav_buttons"></div>
         </div>`;
 const itemTpl =
         `<li class="item">
@@ -46,7 +49,9 @@ const itemTpl =
 const $view = dom(viewTpl);
 const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
-
+const $pagination_els = $view.find('.nav_buttons');
+const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['btn_last', '>>']];
+var page_nav = {};
 
 const cropSize = (size, min, max) => Math.min(max, Math.max(min, size));
 
@@ -213,6 +218,8 @@ const setHint = l10nKey => {
     checkHint();
 };
 
+const rows_per_page = 5;
+
 const onLocationChanged = item => {
     if (!item) {
         item = location.getItem();
@@ -231,7 +238,32 @@ const onLocationChanged = item => {
     });
 
     setHint('empty');
-    setItems(items);
+
+    // Destroy previous buttons if they exist
+    if (page_nav.buttons) page_nav.buttons.forEach(e => e.remove());
+    // each($view.find('.nav_buttons'), el => destroyNavBar(el));
+
+    if (items.length > rows_per_page) {
+        let page_count = Math.ceil(items.length / rows_per_page);
+        page_nav = { 
+            current_page: 1, 
+            page_count: page_count,
+            buttons: [],
+        };
+        setupPagination(items, $pagination_els, page_nav);
+        displayItems(items, rows_per_page, page_nav.current_page);
+    } else {
+        setItems(items);
+    }
+};
+
+const displayItems = (items, rows_per_page, page) => {
+    page--;
+    let start = rows_per_page * page;
+    let end = start + rows_per_page;
+    let paginatedItems = items.slice(start, end);
+
+    setItems(paginatedItems);
 };
 
 const onLocationRefreshed = (item, added, removed) => {
@@ -245,6 +277,101 @@ const onLocationRefreshed = (item, added, removed) => {
 
     setHint('empty');
     changeItems(add, removed);
+};
+
+const setupPagination = (items, wrapper, page_nav) => {
+    each(wrapper, key => {
+        key.innerHTML = "";
+    });
+
+    for (let i = 0; i < btn_cls.length; i++) {
+        each(wrapper, key => {
+            btn = paginationButton(btn_cls[i], items, page_nav);
+            key.appendChild(btn);
+            page_nav.buttons.push(btn);
+        });
+    }
+
+    each(wrapper, key => {
+        div = updatePageStatus(null, page_nav);
+        key.insertBefore(div, key.childNodes[2]);
+        page_nav.buttons.push(div);
+    });
+};
+
+const paginationButton = (cls, items, page_nav) => {
+	let button = document.createElement('button');
+    button.innerText = cls[1];
+
+    _class = cls[0];
+    button.classList.add(_class);
+
+    let target = () => 1;
+    button.disabled = false;
+    switch (_class) {
+        case 'btn_prev':
+            target = () => page_nav.current_page - 1;
+            button.disabled = true;
+            break;
+        case 'btn_next':
+            target = () => page_nav.current_page + 1;
+            break;
+        case 'btn_last':
+            target = () => page_nav.page_count;
+            break;
+        default:
+            button.disabled = true;
+    }
+    button._mycallback = target;
+
+	button.addEventListener('click', () => {
+        target_page = button._mycallback();
+        console.log("DEBUG target()", target_page, this);
+        displayItems(items, rows_per_page, target_page);
+        page_nav.current_page = target_page;
+        
+        if (page_nav.page_count === 2) {
+            return;
+        }
+        let prev_buttons =  document.querySelectorAll('.btn_first, .btn_prev');
+        let next_buttons =  document.querySelectorAll('.btn_next, .btn_last');
+        if (page_nav.current_page <= 1) {
+            each(prev_buttons, button => button.disabled = true);
+            each(next_buttons, button => button.disabled = false);
+        } else if (page_nav.current_page >= page_nav.page_count && page_nav.current_page > 1) {
+            each(next_buttons, button => button.disabled = true);
+            each(prev_buttons, button => button.disabled = false);
+        } else {
+            let nav_buttons = document.querySelectorAll('.btn_first, .btn_prev, .btn_next, .btn_last');
+            each(nav_buttons, button => button.disabled = false);
+        }
+        let page_pos = document.querySelectorAll('.page_pos');
+        each(page_pos, el => updatePageStatus(el, page_nav));
+	});
+	return button;
+};
+
+const updatePageStatus = (div, page_nav) => {
+    _str = page_nav.current_page.toString().concat('/', page_nav.page_count.toString());
+    if (!div) {
+        div = document.createElement('div');
+        div.appendChild(document.createTextNode(_str));
+        div.classList.add('page_pos');
+        return div;
+    }
+    return div.innerText = _str;
+};
+
+const destroyNavBar = (el) => {
+    // page_nav.buttons.forEach(el => {
+    //     // el.removeEventListener()
+    //     // delete el;
+    // });
+    console.log("destroying el:", el);
+    el.innerHTML = "";
+    // each(el.childNodes, e => {
+    //     if (e !== undefined) e.remove();
+    // });
 };
 
 const onResize = () => {
