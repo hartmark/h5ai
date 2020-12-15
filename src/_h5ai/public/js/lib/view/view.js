@@ -243,22 +243,67 @@ const onLocationChanged = item => {
     if (page_nav.buttons) {
         page_nav.buttons.forEach(e => e.remove());
         delete page_nav.buttons;
+        // delete page_nav;
     }
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
 
     if (items.length > rows_per_page) {
-        let page_count = Math.ceil(items.length / rows_per_page);
-        page_nav = {
-            current_page: 1,
-            page_count: page_count,
-            buttons: [],
-        };
+        // let page_count = Math.ceil(items.length / rows_per_page);
+        // page_nav = {
+        //     current_page: 1,
+        //     page_count: page_count,
+        //     buttons: [],
+        //     next_page: function () { return (this.current_page + 1); },
+        //     prev_page: function () { return (this.current_page - 1); },
+        //     last_page: function () { return this.page_count; }
+        // };
+        page_nav = new Pagination(items);
         setupPagination(items, $pagination_els, page_nav);
         displayItems(items, rows_per_page, page_nav.current_page);
     } else {
         setItems(items);
     }
 };
+
+// const Pagination = (items) => {
+//     const inst = Object.assign(Object.create(Pagination.prototype), {
+//         items: items,
+//         current_page: 1,
+//         page_count: Math.ceil(items.length / rows_per_page),
+//         buttons: [],
+//     });
+//     return inst;
+// };
+
+// Pagination.prototype = {
+//     constructor: Pagination,
+
+//     next_page: function () { return (this.current_page + 1); },
+//     prev_page: function () { return (this.current_page - 1); },
+//     last_page: function () { return this.page_count; }
+// };
+
+class Pagination {
+    constructor(items) {
+        this.items = items;
+        this.current_page = 1;
+        this.page_count = Math.ceil(items.length / rows_per_page);
+        this.buttons = [];
+    }
+    get next_page() { return (this.current_page + 1); }
+    get prev_page() { return (this.current_page - 1); }
+    get last_page() { return this.page_count; }
+}
+
+// function Pagination(items) {
+//     this.items = items;
+//     this.current_page = 1;
+//     this.page_count = Math.ceil(items.length / rows_per_page);
+//     this.buttons = [];
+//     this.next_page = function () { return (this.current_page + 1); };
+//     this.prev_page = function () { return (this.current_page - 1); };
+//     this.last_page = function () { return this.page_count; };
+// }
 
 const displayItems = (items, rows_per_page, page) => {
     updatePageNav(page);
@@ -386,23 +431,23 @@ const paginationButton = (cls, items, page_nav) => {
     _class = cls[0];
     button.classList.add(_class);
 
-    let req_page = () => 1;
-    button.disabled = false;
     switch (_class) {
         case 'btn_prev':
-            req_page = () => page_nav.current_page - 1;
+            button.req_page = () => page_nav.prev_page;
             button.disabled = true;
             break;
         case 'btn_next':
-            req_page = () => page_nav.current_page + 1;
+            button.req_page = () => page_nav.next_page;
+            button.disabled = false;
             break;
         case 'btn_last':
-            req_page = () => page_nav.page_count;
+            button.req_page = () => page_nav.last_page;
+            button.disabled = false;
             break;
-        default:
+        default: // 'btn_first'
+            button.req_page = () => 1;
             button.disabled = true;
     }
-    button.req_page = req_page;
     button.items = items;
 
 	button.addEventListener('click', onButtonClicked);
