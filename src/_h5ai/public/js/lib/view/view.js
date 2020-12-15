@@ -24,7 +24,9 @@ const checkedModes = intersection(settings.modes, modes);
 const storekey = 'view';
 const viewTpl =
         `<div id="view">
-            <div id="pagination_top" class="nav_buttons"></div>
+            <div id="pagination_top" class="pagination">
+                <div id="nav_top" class="nav_buttons"></div>
+            </div>
             <ul id="items" class="clearfix">
                 <li class="header">
                     <a class="icon"></a>
@@ -34,7 +36,9 @@ const viewTpl =
                 </li>
             </ul>
             <div id="view-hint"></div>
-            <div id="pagination_btm" class="nav_buttons"></div>
+            <div id="pagination_btm" class="pagination">
+                <div id="nav_btm" class="nav_buttons"></div>
+            </div>
         </div>`;
 const itemTpl =
         `<li class="item">
@@ -245,8 +249,8 @@ const onLocationChanged = item => {
 
     if (items.length > rows_per_page) {
         let page_count = Math.ceil(items.length / rows_per_page);
-        page_nav = { 
-            current_page: 1, 
+        page_nav = {
+            current_page: 1,
             page_count: page_count,
             buttons: [],
         };
@@ -286,18 +290,81 @@ const setupPagination = (items, wrapper, page_nav) => {
 
     for (let i = 0; i < btn_cls.length; i++) {
         each(wrapper, key => {
-            btn = paginationButton(btn_cls[i], items, page_nav);
+            let btn = paginationButton(btn_cls[i], items, page_nav);
             key.appendChild(btn);
             page_nav.buttons.push(btn);
         });
     }
 
     each(wrapper, key => {
-        div = updatePageStatus(null, page_nav);
+        // Page status
+        let div = updatePageStatus(null, page_nav);
         key.insertBefore(div, key.childNodes[2]);
         page_nav.buttons.push(div);
+
+        // Page number selection
+        div = document.createElement('div');
+        div.classList.add('page_input');
+        let {page_input, go_btn} = pageInputForm(items);
+        div.appendChild(page_input);
+        div.appendChild(go_btn);
+        key.appendChild(div);
+        page_nav.buttons.push(page_input);
+        page_nav.buttons.push(go_btn);
     });
 };
+
+const pageInputForm = (items) => {
+    let input_field = document.createElement('input');
+    input_field.type = 'text';
+    input_field.classList.add('page_input_text');
+    input_field.placeholder = 'page';
+
+    let input_btn = document.createElement('input');
+    input_btn.type = 'button';
+    input_btn.classList.add('page_input_button');
+    input_btn.value = 'GO';
+    input_btn.addEventListener('click', () => {
+        console.log("GO clicked, value: ", input_field.value);
+        displayItems(items, rows_per_page, input_field.value);
+        input_field.value = "";
+        input_field.focus();
+    });
+
+    input_field.addEventListener('keydown', (e) => {
+        if (e.code === 'Enter') {
+            e.preventDefault();
+            console.log("value:", input_field.value);
+            input_btn.click();
+            input_field.value = "";
+            input_field.focus();
+        };
+    });
+
+    setInputFilter(input_field, function(value) {
+        // Only allow digits, Enter and max page
+        return /^[\d]*$/.test(value) && value <= page_nav.page_count;
+    });
+    return {page_input: input_field, go_btn: input_btn};
+};
+
+// Restricts input for the given textbox to the given inputFilter function.
+function setInputFilter(textbox, inputFilter) {
+    ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.addEventListener(event, function() {
+            if (inputFilter(this.value)) {
+            this.oldValue = this.value;
+            this.oldSelectionStart = this.selectionStart;
+            this.oldSelectionEnd = this.selectionEnd;
+            } else if (this.hasOwnProperty("oldValue")) {
+            this.value = this.oldValue;
+            this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+            } else {
+            this.value = "";
+            }
+        });
+    });
+}
 
 const paginationButton = (cls, items, page_nav) => {
 	let button = document.createElement('button');
@@ -306,48 +373,26 @@ const paginationButton = (cls, items, page_nav) => {
     _class = cls[0];
     button.classList.add(_class);
 
-    let target = () => 1;
+    let req_page = () => 1;
     button.disabled = false;
     switch (_class) {
         case 'btn_prev':
-            target = () => page_nav.current_page - 1;
+            req_page = () => page_nav.current_page - 1;
             button.disabled = true;
             break;
         case 'btn_next':
-            target = () => page_nav.current_page + 1;
+            req_page = () => page_nav.current_page + 1;
             break;
         case 'btn_last':
-            target = () => page_nav.page_count;
+            req_page = () => page_nav.page_count;
             break;
         default:
             button.disabled = true;
     }
-    button._mycallback = target;
+    button.req_page = req_page;
+    button.items = items;
 
-	button.addEventListener('click', () => {
-        target_page = button._mycallback();
-        console.log("DEBUG target()", target_page, this);
-        displayItems(items, rows_per_page, target_page);
-        page_nav.current_page = target_page;
-        
-        if (page_nav.page_count === 2) {
-            return;
-        }
-        let prev_buttons =  document.querySelectorAll('.btn_first, .btn_prev');
-        let next_buttons =  document.querySelectorAll('.btn_next, .btn_last');
-        if (page_nav.current_page <= 1) {
-            each(prev_buttons, button => button.disabled = true);
-            each(next_buttons, button => button.disabled = false);
-        } else if (page_nav.current_page >= page_nav.page_count && page_nav.current_page > 1) {
-            each(next_buttons, button => button.disabled = true);
-            each(prev_buttons, button => button.disabled = false);
-        } else {
-            let nav_buttons = document.querySelectorAll('.btn_first, .btn_prev, .btn_next, .btn_last');
-            each(nav_buttons, button => button.disabled = false);
-        }
-        let page_pos = document.querySelectorAll('.page_pos');
-        each(page_pos, el => updatePageStatus(el, page_nav));
-	});
+	button.addEventListener('click', onButtonClicked);
 	return button;
 };
 
@@ -361,6 +406,31 @@ const updatePageStatus = (div, page_nav) => {
     }
     return div.innerText = _str;
 };
+
+function onButtonClicked (event) {
+    target_page = this.req_page();
+    displayItems(this.items, rows_per_page, target_page);
+    page_nav.current_page = target_page;
+
+    updateButtons(page_nav);
+}
+
+function updateButtons(page_nav){
+    let prev_buttons =  document.querySelectorAll('.btn_first, .btn_prev');
+    let next_buttons =  document.querySelectorAll('.btn_next, .btn_last');
+    if (page_nav.current_page <= 1) {
+        each(prev_buttons, button => button.disabled = true);
+        each(next_buttons, button => button.disabled = false);
+    } else if (page_nav.current_page >= page_nav.page_count && page_nav.current_page > 1) {
+        each(next_buttons, button => button.disabled = true);
+        each(prev_buttons, button => button.disabled = false);
+    } else {
+        let nav_buttons = document.querySelectorAll('.btn_first, .btn_prev, .btn_next, .btn_last');
+        each(nav_buttons, button => button.disabled = false);
+    }
+    let page_pos = document.querySelectorAll('.page_pos');
+    each(page_pos, el => updatePageStatus(el, page_nav));
+}
 
 const destroyNavBar = (el) => {
     // page_nav.buttons.forEach(el => {

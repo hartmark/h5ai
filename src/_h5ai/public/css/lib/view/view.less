@@ -92,6 +92,7 @@
         border: none;
         outline: none;
         cursor: pointer;
+        padding: 0;
     
         background-color: #44AAEE;
     
@@ -116,5 +117,54 @@
     .nav_buttons button:disabled {
         background-color: #494949;
         box-shadow: inset 0px 0px 4px rgb(0, 0, 0);
+        cursor: default;
+    }
+
+    // .nav_buttons input {
+    //     background-color: #44EEAA;
+    // }
+
+    .page_input {
+        display: flex;
+        align-content: flex-end;
+        float: left;
+        // margin-left: auto;
+        margin-right: 5px;
+        > input[type="text"]{
+          width: 36px;
+          height: 34px;
+          font-size: 12px;
+          background: #fff;
+          border-radius: 3px;
+          border: 1px solid #aaa;
+          padding: inherit;
+          text-align: center;
+          vertical-align: baseline;
+          outline: none;
+          box-shadow: none;
+          box-sizing: initial;
+        }
+        > input[type="text"]::placeholder {
+            color: rgb(175, 175, 175);
+            opacity: 1; /* Firefox */
+        }
+        > input[type="button"]{
+        //   min-width: @N_buttonMinWidth;
+        //   height: @N_buttonHeight;
+        //   line-height: @N_buttonLineHeight;
+          background: #fff;
+          border-radius: 3px;
+          border: 1px solid black;
+          text-align: center;
+          padding: inherit;
+          vertical-align: baseline;
+          outline: none;
+          box-shadow: none;
+          color: #333;
+          cursor: pointer;
+          &:hover{
+            background-color: #f8f8f8;
+          }
+        }
     }
 }
