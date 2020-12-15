@@ -82,33 +82,38 @@
         flex-wrap: wrap;
         justify-content: center;
         align-items: center;
+        position: -webkit-sticky; /* Safari */
+        position: sticky;
+        bottom: 0;
     }
-    
+
+    #pagination_btm {
+        position: -webkit-sticky; /* Safari */
+        position: sticky;
+        bottom: 0;
+    }
+
     .nav_buttons button {
         width: 20px;
         height: 30px;
-    
         appearance: none;
         border: none;
         outline: none;
         cursor: pointer;
         padding: 0;
-    
         background-color: #44AAEE;
-    
         margin: 5px;
         transition: 0.4s;
-    
         color: #FFF;
         font-size: 18px;
         text-shadow: 0px 0px 4px rgba(0, 0, 0, 0.2);
         box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.2);
     }
-    
+
     .nav_buttons button:hover {
         background-color: #44EEAA;
     }
-    
+
     .nav_buttons button.active {
         background-color: #44EEAA;
         box-shadow: inset 0px 0px 4px rgba(0, 0, 0, 0.2);
@@ -119,10 +124,6 @@
         box-shadow: inset 0px 0px 4px rgb(0, 0, 0);
         cursor: default;
     }
-
-    // .nav_buttons input {
-    //     background-color: #44EEAA;
-    // }
 
     .page_input {
         display: flex;

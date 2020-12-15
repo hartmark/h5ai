@@ -6,7 +6,6 @@ const resource = require('../core/resource');
 const store = require('../core/store');
 const allsettings = require('../core/settings');
 const base = require('./base');
-// const item = require('../model/item');
 
 const modes = ['details', 'grid', 'icons'];
 const sizes = [20, 40, 60, 80, 100, 150, 200, 250, 300, 350, 400];
@@ -24,9 +23,6 @@ const checkedModes = intersection(settings.modes, modes);
 const storekey = 'view';
 const viewTpl =
         `<div id="view">
-            <div id="pagination_top" class="pagination">
-                <div id="nav_top" class="nav_buttons"></div>
-            </div>
             <ul id="items" class="clearfix">
                 <li class="header">
                     <a class="icon"></a>
@@ -222,7 +218,7 @@ const setHint = l10nKey => {
     checkHint();
 };
 
-const rows_per_page = 5;
+const rows_per_page = 30;
 
 const onLocationChanged = item => {
     if (!item) {
@@ -244,7 +240,10 @@ const onLocationChanged = item => {
     setHint('empty');
 
     // Destroy previous buttons if they exist
-    if (page_nav.buttons) page_nav.buttons.forEach(e => e.remove());
+    if (page_nav.buttons) {
+        page_nav.buttons.forEach(e => e.remove());
+        delete page_nav.buttons;
+    }
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
 
     if (items.length > rows_per_page) {
@@ -262,12 +261,14 @@ const onLocationChanged = item => {
 };
 
 const displayItems = (items, rows_per_page, page) => {
+    updatePageNav(page);
     page--;
     let start = rows_per_page * page;
     let end = start + rows_per_page;
     let paginatedItems = items.slice(start, end);
 
     setItems(paginatedItems);
+    updateButtons(page_nav);
 };
 
 const onLocationRefreshed = (item, added, removed) => {
@@ -325,33 +326,45 @@ const pageInputForm = (items) => {
     input_btn.classList.add('page_input_button');
     input_btn.value = 'GO';
     input_btn.addEventListener('click', () => {
-        console.log("GO clicked, value: ", input_field.value);
-        displayItems(items, rows_per_page, input_field.value);
+        if (input_field.value !== '' && input_field.value !== page_nav.current_page) {
+            displayItems(items, rows_per_page, input_field.value);
+        }
         input_field.value = "";
         input_field.focus();
     });
 
     input_field.addEventListener('keydown', (e) => {
-        if (e.code === 'Enter') {
-            e.preventDefault();
-            console.log("value:", input_field.value);
-            input_btn.click();
+        if (e.key === 'Enter' && input_field.value && !/[^\s]/.test(input_field.value)) {
+            if (input_field.value !== page_nav.current_page) {
+                e.preventDefault();
+                displayItems(items, rows_per_page, input_field.value);
+            }
             input_field.value = "";
             input_field.focus();
         };
     });
 
+    // Only allow digits, Enter and max page, no leading zero or spaces
     setInputFilter(input_field, function(value) {
-        // Only allow digits, Enter and max page
-        return /^[\d]*$/.test(value) && value <= page_nav.page_count;
+        return /^[^0\s][\d]*$/.test(value) && value <= page_nav.page_count;
     });
+
     return {page_input: input_field, go_btn: input_btn};
 };
 
 // Restricts input for the given textbox to the given inputFilter function.
+// In the future we could use beforeinput instead.
 function setInputFilter(textbox, inputFilter) {
-    ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+    ["input", "keydown", "keyup", "mousedown", "mouseup", "select",
+    "contextmenu", "drop"].forEach(function(event) {
         textbox.addEventListener(event, function() {
+            // FIXME avoid double digit input???????????
+            console.log("inputbox:", event, this.value);
+            if (this.value === '') {
+                console.log("Blocking empty value!");
+                this.oldValue = this.value;
+                return;
+            }
             if (inputFilter(this.value)) {
             this.oldValue = this.value;
             this.oldSelectionStart = this.selectionStart;
@@ -407,12 +420,12 @@ const updatePageStatus = (div, page_nav) => {
     return div.innerText = _str;
 };
 
-function onButtonClicked (event) {
-    target_page = this.req_page();
-    displayItems(this.items, rows_per_page, target_page);
-    page_nav.current_page = target_page;
+function onButtonClicked (ev) {
+    displayItems(this.items, rows_per_page, this.req_page());
+}
 
-    updateButtons(page_nav);
+function updatePageNav(current_page) {
+    page_nav.current_page = current_page;
 }
 
 function updateButtons(page_nav){
