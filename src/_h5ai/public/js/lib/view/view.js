@@ -32,9 +32,10 @@ const viewTpl =
                 </li>
             </ul>
             <div id="view-hint"></div>
-            <div id="pagination_btm" class="pagination">
-                <div id="nav_btm" class="nav_buttons"></div>
-            </div>
+        </div>`;
+const paginationTpl =
+        `<div id="pagination_btm" class="pagination">
+            <div id="nav_btm" class="nav_buttons"></div>
         </div>`;
 const itemTpl =
         `<li class="item">
@@ -49,7 +50,7 @@ const itemTpl =
 const $view = dom(viewTpl);
 const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
-const $pagination_els = $view.find('.nav_buttons');
+const $pagination = dom(paginationTpl);
 const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['btn_last', '>>']];
 var page_nav = {};
 
@@ -187,6 +188,8 @@ const checkHint = () => {
     }
 };
 
+// TODO: make a proxy handler for Search here to avoid big lists?
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy
 const setItems = items => {
     const removed = map($items.find('.item'), el => el._item);
 
@@ -248,40 +251,12 @@ const onLocationChanged = item => {
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
 
     if (items.length > rows_per_page) {
-        // let page_count = Math.ceil(items.length / rows_per_page);
-        // page_nav = {
-        //     current_page: 1,
-        //     page_count: page_count,
-        //     buttons: [],
-        //     next_page: function () { return (this.current_page + 1); },
-        //     prev_page: function () { return (this.current_page - 1); },
-        //     last_page: function () { return this.page_count; }
-        // };
         page_nav = new Pagination(items);
-        setupPagination(items, $pagination_els, page_nav);
         displayItems(items, rows_per_page, page_nav.current_page);
     } else {
         setItems(items);
     }
 };
-
-// const Pagination = (items) => {
-//     const inst = Object.assign(Object.create(Pagination.prototype), {
-//         items: items,
-//         current_page: 1,
-//         page_count: Math.ceil(items.length / rows_per_page),
-//         buttons: [],
-//     });
-//     return inst;
-// };
-
-// Pagination.prototype = {
-//     constructor: Pagination,
-
-//     next_page: function () { return (this.current_page + 1); },
-//     prev_page: function () { return (this.current_page - 1); },
-//     last_page: function () { return this.page_count; }
-// };
 
 class Pagination {
     constructor(items) {
@@ -289,24 +264,59 @@ class Pagination {
         this.current_page = 1;
         this.page_count = Math.ceil(items.length / rows_per_page);
         this.buttons = [];
+        this.$pagination_els = base.$content.find('.nav_buttons');
+        console.log("element:", this.$pagination_els);
+        this.setupPagination(items, this.$pagination_els);
     }
     get next_page() { return (this.current_page + 1); }
     get prev_page() { return (this.current_page - 1); }
     get last_page() { return this.page_count; }
+
+    set_current_page(page) {
+        const parsed = parseInt(page, 10);
+        if (!isNaN(parsed)) {
+            this.current_page = parsed;
+        }
+        return parsed;
+    };
+
+    setupPagination(items, wrapper) {
+        each(wrapper, key => {
+            key.innerHTML = "";
+        });
+
+        for (let i = 0; i < btn_cls.length; i++) {
+            each(wrapper, key => {
+                let btn = paginationButton(btn_cls[i], items, this);
+                key.appendChild(btn);
+                this.buttons.push(btn);
+            });
+        }
+
+        each(wrapper, key => {
+            // Page status
+            let div = updatePageStatus(null, this);
+            key.insertBefore(div, key.childNodes[2]);
+            this.buttons.push(div);
+
+            // Page number selection
+            div = document.createElement('div');
+            div.classList.add('page_input');
+            let {page_input, go_btn} = pageInputForm(items);
+            div.appendChild(page_input);
+            div.appendChild(go_btn);
+            key.appendChild(div);
+            this.buttons.push(page_input);
+            this.buttons.push(go_btn);
+        });
+    }
 }
 
-// function Pagination(items) {
-//     this.items = items;
-//     this.current_page = 1;
-//     this.page_count = Math.ceil(items.length / rows_per_page);
-//     this.buttons = [];
-//     this.next_page = function () { return (this.current_page + 1); };
-//     this.prev_page = function () { return (this.current_page - 1); };
-//     this.last_page = function () { return this.page_count; };
-// }
-
 const displayItems = (items, rows_per_page, page) => {
-    updatePageNav(page);
+    page = page_nav.set_current_page(page);
+    if (isNaN(page)) {
+        return;
+    }
     page--;
     let start = rows_per_page * page;
     let end = start + rows_per_page;
@@ -327,37 +337,6 @@ const onLocationRefreshed = (item, added, removed) => {
 
     setHint('empty');
     changeItems(add, removed);
-};
-
-const setupPagination = (items, wrapper, page_nav) => {
-    each(wrapper, key => {
-        key.innerHTML = "";
-    });
-
-    for (let i = 0; i < btn_cls.length; i++) {
-        each(wrapper, key => {
-            let btn = paginationButton(btn_cls[i], items, page_nav);
-            key.appendChild(btn);
-            page_nav.buttons.push(btn);
-        });
-    }
-
-    each(wrapper, key => {
-        // Page status
-        let div = updatePageStatus(null, page_nav);
-        key.insertBefore(div, key.childNodes[2]);
-        page_nav.buttons.push(div);
-
-        // Page number selection
-        div = document.createElement('div');
-        div.classList.add('page_input');
-        let {page_input, go_btn} = pageInputForm(items);
-        div.appendChild(page_input);
-        div.appendChild(go_btn);
-        key.appendChild(div);
-        page_nav.buttons.push(page_input);
-        page_nav.buttons.push(go_btn);
-    });
 };
 
 const pageInputForm = (items) => {
@@ -402,13 +381,11 @@ const pageInputForm = (items) => {
 function setInputFilter(textbox, inputFilter) {
     ["input", "keydown", "keyup", "mousedown", "mouseup", "select",
     "contextmenu", "drop"].forEach(function(event) {
-        textbox.addEventListener(event, function() {
-            // FIXME avoid double digit input???????????
-            console.log("inputbox:", event, this.value);
+        textbox.addEventListener(event, function(e) {
             if (this.value === '') {
-                console.log("Blocking empty value!");
+                console.log("inputbox: blocking empty value!");
                 this.oldValue = this.value;
-                return;
+                // return;
             }
             if (inputFilter(this.value)) {
             this.oldValue = this.value;
@@ -469,10 +446,6 @@ function onButtonClicked (ev) {
     displayItems(this.items, rows_per_page, this.req_page());
 }
 
-function updatePageNav(current_page) {
-    page_nav.current_page = current_page;
-}
-
 function updateButtons(page_nav){
     let prev_buttons =  document.querySelectorAll('.btn_first, .btn_prev');
     let next_buttons =  document.querySelectorAll('.btn_next, .btn_last');
@@ -518,6 +491,7 @@ const init = () => {
     set();
 
     $view.appTo(base.$content);
+    $pagination.appTo(base.$content);
     $hint.hide();
 
     format.setDefaultMetric(settings.binaryPrefix);
