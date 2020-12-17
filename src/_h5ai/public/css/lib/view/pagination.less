@@ -1,3 +1,17 @@
+// @minWidth: 30px;
+// @height: 28px;
+// @lineHeight: @height;
+// @activeHeight: @height + 2;
+@inputWidth: 30px;
+@inputHeight: 28px;
+@buttonMinWidth: 40px;
+@buttonHeight: 30px;
+@buttonLineHeight: @buttonHeight - 2;
+@buttonPadding: 0 8px;
+// @navHeight: @activeHeight;
+@col-hover-green: #44EEAA;
+@col-placeholder-grey: rgb(170, 170, 170);
+
 #pagination_btm {
 
     position: -webkit-sticky; /* Safari */
@@ -15,77 +29,71 @@
     }
 
     .nav_buttons button {
-        width: 20px;
-        height: 30px;
+        width: @buttonMinWidth; // 20px;
+        height: @buttonHeight; // 30px;
         appearance: none;
         border: none;
         outline: none;
         cursor: pointer;
         padding: 0;
-        background-color: #44AAEE;
+        background-color: @col-link;
         margin: 5px;
         transition: 0.4s;
-        color: #FFF;
-        font-size: 18px;
+        color: @col-back;
+        font-size: @font-size;
         text-shadow: 0px 0px 4px rgba(0, 0, 0, 0.2);
         box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .nav_buttons button:hover {
-        background-color: #44EEAA;
-    }
-
-    .nav_buttons button.active {
-        background-color: #44EEAA;
-        box-shadow: inset 0px 0px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .nav_buttons button:disabled {
-        background-color: #494949;
-        box-shadow: inset 0px 0px 4px rgb(0, 0, 0);
-        cursor: default;
+        &:hover {
+            background-color: @col-hover-green
+        }
+        &:disabled {
+            background-color: @col-text-disabled-black;
+            box-shadow: inset 0px 0px 4px rgb(0, 0, 0);
+            cursor: default;
+        }
     }
 
     .page_input {
         display: flex;
         align-content: flex-end;
         float: left;
-        // margin-left: auto;
+        margin-left: 5px;
         margin-right: 5px;
+        font-size: @font-size;
         > input[type="text"]{
-            width: 36px;
-            height: 34px;
-            font-size: 12px;
-            background: #fff;
+            width: @inputWidth;
+            height: @inputHeight;
+            background: @col-back;
             border-radius: 3px;
-            border: 1px solid #aaa;
-            padding: inherit;
+            border: 1px solid @col-divider-black;
+            padding: @buttonPadding;
             text-align: center;
             vertical-align: baseline;
             outline: none;
             box-shadow: none;
             box-sizing: initial;
+            &::placeholder {
+                color: @col-placeholder-grey;
+                opacity: 1; /* Firefox */
+            }
         }
-        > input[type="text"]::placeholder {
-            color: rgb(175, 175, 175);
-            opacity: 1; /* Firefox */
-        }
+
         > input[type="button"]{
-        //   min-width: @N_buttonMinWidth;
-        //   height: @N_buttonHeight;
-        //   line-height: @N_buttonLineHeight;
-            background: #fff;
+            min-width: @buttonMinWidth;
+            height: @buttonHeight;
+            line-height: @buttonLineHeight;
+            background: @col-back;
             border-radius: 3px;
-            border: 1px solid black;
+            border: 1px solid @col-divider-black;
             text-align: center;
-            padding: inherit;
+            padding: @buttonPadding;
             vertical-align: baseline;
             outline: none;
             box-shadow: none;
-            color: #333;
+            color: @col-text;
             cursor: pointer;
             &:hover{
-                background-color: #f8f8f8;
+                background-color: @col-hover-green;
             }
         }
     }
