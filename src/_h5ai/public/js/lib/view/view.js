@@ -1,4 +1,4 @@
-const {each, map, includes, intersection, dom} = require('../util');
+const {each, map, values, includes, intersection, dom} = require('../util');
 const event = require('../core/event');
 const format = require('../core/format');
 const location = require('../core/location');
@@ -47,7 +47,8 @@ const itemTpl =
 const $view = dom(viewTpl);
 const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
-var page_nav = undefined;
+let page_nav = undefined;
+let displayItems = undefined;
 
 const cropSize = (size, min, max) => Math.min(max, Math.max(min, size));
 
@@ -221,15 +222,15 @@ const onLocationChanged = item => {
         item = location.getItem();
     }
 
-    const items = [];
+    displayItems = [];
 
     if (item.parent && !settings.hideParentFolder) {
-        items.push(item.parent);
+        displayItems.push(item.parent);
     }
 
     each(item.content, child => {
         if (!(child.isFolder() && settings.hideFolders)) {
-            items.push(child);
+            displayItems.push(child);
         }
     });
 
@@ -239,17 +240,34 @@ const onLocationChanged = item => {
     if (page_nav){
         page_nav.buttons.forEach(e => e.remove());
         delete page_nav.buttons;
-        // delete page_nav;
+        page_nav = undefined;
     }
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
 
-    if (items.length > pagination.getDefaultSize()) {
-        page_nav = new pagination.Pagination(items, module.exports);
+    if (displayItems.length > pagination.getCachedPref()) {
+        page_nav = new pagination.Pagination(displayItems, module.exports);
         page_nav.sliceItems(1);
     } else {
-        setItems(items);
+        setItems(displayItems);
     }
 };
+
+const onPaginationUpdated = (pref) => {
+    if (!page_nav) {
+        page_nav = new pagination.Pagination(displayItems, module.exports);
+        page_nav.rows_per_page = pref;
+        page_nav.sliceItems(1);
+        return;
+    }
+    page_nav.rows_per_page = pref;
+    let count = page_nav.computeTotalPages();
+    console.log(`count received: ${count}`);
+
+    page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
+    console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
+
+    page_nav.sliceItems(page);
+}
 
 const onLocationRefreshed = (item, added, removed) => {
     const add = [];
@@ -287,6 +305,7 @@ const init = () => {
 
     event.sub('location.changed', onLocationChanged);
     event.sub('location.refreshed', onLocationRefreshed);
+    event.sub('pagination.pref.changed', onPaginationUpdated)
     event.sub('resize', onResize);
     onResize();
 };
