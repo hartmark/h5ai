@@ -202,7 +202,7 @@ class Pagination {
             } else {
                 base.$content.find('.nav_buttons').rmCls('hidden');
             }
-            this.view.setItems(paginatedItems);
+            this.view.doSetItems(paginatedItems);
         }
         // this.current_items = paginatedItems;
         // return paginatedItems;

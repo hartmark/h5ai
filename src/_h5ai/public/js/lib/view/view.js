@@ -184,9 +184,26 @@ const checkHint = () => {
     }
 };
 
-// TODO: make a proxy handler for Search here to avoid big lists?
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy
 const setItems = items => {
+    displayItems = items;
+
+    // Destroy previous buttons if they exist
+    if (page_nav){
+        page_nav.buttons.forEach(e => e.remove());
+        delete page_nav.buttons;
+        page_nav = undefined;
+    }
+    // each($view.find('.nav_buttons'), el => destroyNavBar(el));
+
+    if (displayItems.length > pagination.getCachedPref()) {
+        page_nav = new pagination.Pagination(displayItems, module.exports);
+        page_nav.sliceItems(1);
+    } else {
+        doSetItems(items);
+    }
+};
+
+const doSetItems = items => {
     const removed = map($items.find('.item'), el => el._item);
 
     $items.find('.item').rm();
@@ -222,34 +239,21 @@ const onLocationChanged = item => {
         item = location.getItem();
     }
 
-    displayItems = [];
+    const items = [];
 
     if (item.parent && !settings.hideParentFolder) {
-        displayItems.push(item.parent);
+        items.push(item.parent);
     }
 
     each(item.content, child => {
         if (!(child.isFolder() && settings.hideFolders)) {
-            displayItems.push(child);
+            items.push(child);
         }
     });
 
     setHint('empty');
 
-    // Destroy previous buttons if they exist
-    if (page_nav){
-        page_nav.buttons.forEach(e => e.remove());
-        delete page_nav.buttons;
-        page_nav = undefined;
-    }
-    // each($view.find('.nav_buttons'), el => destroyNavBar(el));
-
-    if (displayItems.length > pagination.getCachedPref()) {
-        page_nav = new pagination.Pagination(displayItems, module.exports);
-        page_nav.sliceItems(1);
-    } else {
-        setItems(displayItems);
-    }
+    setItems(items);
 };
 
 const onPaginationUpdated = (pref) => {
@@ -315,6 +319,7 @@ init();
 module.exports = {
     $el: $view,
     setItems,
+    doSetItems,
     changeItems,
     setLocation: onLocationChanged,
     setHint,
