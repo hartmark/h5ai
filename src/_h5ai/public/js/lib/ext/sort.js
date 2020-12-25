@@ -3,6 +3,7 @@ const event = require('../core/event');
 const resource = require('../core/resource');
 const allsettings = require('../core/settings');
 const store = require('../core/store');
+const view = require('../view/view');
 
 const settings = Object.assign({
     enabled: false,
@@ -58,10 +59,15 @@ const sortItems = (column, reverse) => {
     $headers.rmCls('ascending').rmCls('descending');
     $header.addCls(reverse ? 'descending' : 'ascending');
 
+    // this.view.page_nav.sort()
+    // pagination.sort(pagination.items)
+    // this.view.setItems()
     dom(toArray(dom('#items .item:not(.folder-parent)')).sort(fn)).appTo('#items');
 };
 
 const onContentChanged = () => {
+    //BLOCK if we have pagination active
+    // but do sort directories first in pagination!
     const order = store.get(storekey);
     const column = order && order.column || settings.column;
     const reverse = order && order.reverse || settings.reverse;

@@ -47,11 +47,17 @@ class Pagination {
         this.buttons = [];
         this.$pagination_els = base.$content.find('.nav_buttons');
         this.setupPagination(items, this.$pagination_els);
+        this.active = true;
     }
     get next_page() { return (this.current_page + 1); }
     get prev_page() { return (this.current_page - 1); }
     get last_page() { return this.page_count; }
 
+    isActive() { 
+        return this.active;
+    }
+
+    //TODO put this in a setter for this.items to compute automatically when it's modified
     computeTotalPages() {
         if (this.rows_per_page == 0){
             this.page_count = 1;
@@ -189,7 +195,7 @@ class Pagination {
             console.log(`Page ${page} is NaN!`);
 			return;
         }
-        console.log(`sliceItems: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
+        // console.log(`sliceItems: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
 
         let paginatedItems = this.computeSlice(
                     this.items, this.current_page, this.rows_per_page);
@@ -197,10 +203,12 @@ class Pagination {
 
         if (update) {
             this.updateButtons();
-            if (this.last_page == 1) {
+            if (this.last_page <= 1) {
                 base.$content.find('.nav_buttons').addCls('hidden');
+                this.active = false;
             } else {
                 base.$content.find('.nav_buttons').rmCls('hidden');
+                this.active = true;
             }
             this.view.doSetItems(paginatedItems);
         }

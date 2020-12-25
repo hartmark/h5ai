@@ -47,8 +47,8 @@ const itemTpl =
 const $view = dom(viewTpl);
 const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
-let page_nav = undefined;
-let displayItems = undefined;
+let page_nav;
+let displayItems;
 
 const cropSize = (size, min, max) => Math.min(max, Math.max(min, size));
 
@@ -274,6 +274,40 @@ const onPaginationUpdated = (pref) => {
 }
 
 const onLocationRefreshed = (item, added, removed) => {
+    console.log(`refresh items: ${item.length} added ${added} length ${added.length} removed ${removed} length ${removed.length}`);
+    if (added.length === 0 && removed.length === 0){
+        return;
+    }
+
+    // Block if pagination is active
+    console.log(`Refresh->items.len=${values(item.content).length}, pref: ${pagination.getCachedPref()}`);
+    if (values(item.content).length > pagination.getCachedPref()) {
+        if (!page_nav){
+            page_nav = new pagination.Pagination(values(item.content), module.exports);
+            page_nav.sliceItems(1);
+            return;
+        }
+        page_nav.items = values(item.content);
+        if(page_nav.isActive()){
+            console.log("page nav is active! slicing new items");
+            page_nav.computeTotalPages();
+            page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
+            page_nav.sliceItems(page);
+        } else {
+            console.log("page_nav not active, but needed! TOGGLE ON PLZ");
+            page_nav.computeTotalPages();
+            page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
+            page_nav.sliceItems(page);
+        }
+        return;
+    } else {
+        if (page_nav){
+            page_nav.buttons.forEach(e => e.remove());
+            delete page_nav.buttons;
+            page_nav = undefined;
+        }
+    }
+
     const add = [];
 
     each(added, child => {
@@ -283,6 +317,7 @@ const onLocationRefreshed = (item, added, removed) => {
     });
 
     setHint('empty');
+
     changeItems(add, removed);
 };
 
@@ -318,6 +353,7 @@ init();
 
 module.exports = {
     $el: $view,
+    page_nav,
     setItems,
     doSetItems,
     changeItems,
