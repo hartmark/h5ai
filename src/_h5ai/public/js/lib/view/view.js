@@ -49,6 +49,7 @@ const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
 let page_nav;
 let displayItems;
+let payload;
 
 const cropSize = (size, min, max) => Math.min(max, Math.max(min, size));
 
@@ -196,7 +197,7 @@ const setItems = items => {
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
 
     if (displayItems.length > pagination.getCachedPref()) {
-        page_nav = new pagination.Pagination(displayItems, module.exports);
+        page_nav = new pagination.Pagination(displayItems, payload, module.exports);
         page_nav.sliceItems(1);
     } else {
         doSetItems(items);
@@ -239,6 +240,16 @@ const onLocationChanged = item => {
         item = location.getItem();
     }
 
+    payload = item; // caching for reuse
+
+    const items = filterPayload(item);
+
+    setHint('empty');
+
+    setItems(items);
+};
+
+const filterPayload = item => {
     const items = [];
 
     if (item.parent && !settings.hideParentFolder) {
@@ -250,15 +261,12 @@ const onLocationChanged = item => {
             items.push(child);
         }
     });
-
-    setHint('empty');
-
-    setItems(items);
-};
+    return items;
+}
 
 const onPaginationUpdated = (pref) => {
     if (!page_nav) {
-        page_nav = new pagination.Pagination(displayItems, module.exports);
+        page_nav = new pagination.Pagination(displayItems, payload, module.exports);
         page_nav.rows_per_page = pref;
         page_nav.sliceItems(1);
         return;
@@ -275,6 +283,7 @@ const onPaginationUpdated = (pref) => {
 
 const onLocationRefreshed = (item, added, removed) => {
     console.log(`refresh items: ${item.length} added ${added} length ${added.length} removed ${removed} length ${removed.length}`);
+    payload = item;
     if (added.length === 0 && removed.length === 0){
         return;
     }
@@ -283,25 +292,33 @@ const onLocationRefreshed = (item, added, removed) => {
     console.log(`Refresh->items.len=${values(item.content).length}, pref: ${pagination.getCachedPref()}`);
     if (values(item.content).length > pagination.getCachedPref()) {
         if (!page_nav){
-            page_nav = new pagination.Pagination(values(item.content), module.exports);
+            page_nav = new pagination.Pagination(values(item.content), payload, module.exports);
             page_nav.sliceItems(1);
             return;
         }
-        page_nav.items = values(item.content);
+        page_nav.item = payload;
+        page_nav.items = filterPayload(item);
         if(page_nav.isActive()){
             console.log("page nav is active! slicing new items");
             page_nav.computeTotalPages();
             page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
             page_nav.sliceItems(page);
         } else {
-            console.log("page_nav not active, but needed! TOGGLE ON PLZ");
+            console.log("page_nav not active, but needed!");
             page_nav.computeTotalPages();
             page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
             page_nav.sliceItems(page);
         }
         return;
     } else {
+        // FIXME needs improvement
+        // We recreate the items and remove ourselves to leave the default logic do its thing
         if (page_nav){
+            if (page_nav.isActive()){
+                page_nav.items = values(item.content);
+                page_nav.computeTotalPages();
+                page_nav.sliceItems(1);
+            }
             page_nav.buttons.forEach(e => e.remove());
             delete page_nav.buttons;
             page_nav = undefined;
@@ -351,9 +368,13 @@ const init = () => {
 
 init();
 
+const getPag = () => {
+    return page_nav;
+}
+
 module.exports = {
     $el: $view,
-    page_nav,
+    getPag,
     setItems,
     doSetItems,
     changeItems,

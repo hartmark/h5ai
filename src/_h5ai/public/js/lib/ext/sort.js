@@ -23,8 +23,8 @@ const columnClasses = {0: 'label', 1: 'date', 2: 'size'};
 
 const cmpFn = (prop, reverse, ignorecase, natural) => {
     return (el1, el2) => {
-        const item1 = el1._item;
-        const item2 = el2._item;
+        const item1 = el1._item === undefined ? el1 : el1._item;
+        const item2 = el2._item === undefined ? el2 : el2._item;
 
         let res = getTypeOrder(item1) - getTypeOrder(item2);
         if (res !== 0) {
@@ -59,21 +59,35 @@ const sortItems = (column, reverse) => {
     $headers.rmCls('ascending').rmCls('descending');
     $header.addCls(reverse ? 'descending' : 'ascending');
 
-    // this.view.page_nav.sort()
-    // pagination.sort(pagination.items)
-    // this.view.setItems()
+    let pag = view.getPag();
+    if (pag && pag.isActive()){
+        pag.sort(fn);
+        page = (pag.current_page <= pag.last_page) ? pag.current_page : pag.last_page;
+        pag.sliceItems(page);
+        return;
+    }
     dom(toArray(dom('#items .item:not(.folder-parent)')).sort(fn)).appTo('#items');
 };
 
 const onContentChanged = () => {
-    //BLOCK if we have pagination active
-    // but do sort directories first in pagination!
+    if (view.getPag() && view.getPag().isActive()){
+        console.log("sort.onContentChanged() blocked!");
+        return;
+    }
+    console.log("sort.onContentChanged() passed!");
     const order = store.get(storekey);
     const column = order && order.column || settings.column;
     const reverse = order && order.reverse || settings.reverse;
 
     sortItems(column, reverse);
 };
+
+const getSortPref = () => {
+    const order = store.get(storekey);
+    const column = order && order.column || settings.column;
+    const reverse = order && order.reverse || settings.reverse;
+    return cmpFn(columnProps[column], reverse, settings.ignorecase, settings.natural);
+}
 
 const addToggles = () => {
     const $header = dom('#items li.header');
@@ -100,3 +114,7 @@ const init = () => {
 
 
 init();
+
+module.exports = {
+    getSortPref
+}

@@ -1,4 +1,4 @@
-const {each, includes, dom} = require('../util');
+const {each, includes, dom, values} = require('../util');
 const event = require('../core/event');
 // const location = require('../core/location');
 const store = require('../core/store');
@@ -36,9 +36,10 @@ const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['bt
 let sizePref;
 
 class Pagination {
-    constructor(items, view) {
+    constructor(items, item, view) {
 		this.view = view;
         this.rows_per_page = getPref();
+        this.item = item;
         this.items = items;
         this.current_page = 1;
         this.current_items;
@@ -48,12 +49,13 @@ class Pagination {
         this.$pagination_els = base.$content.find('.nav_buttons');
         this.setupPagination(items, this.$pagination_els);
         this.active = true;
+        this.initial_sort();
     }
     get next_page() { return (this.current_page + 1); }
     get prev_page() { return (this.current_page - 1); }
     get last_page() { return this.page_count; }
 
-    isActive() { 
+    isActive() {
         return this.active;
     }
 
@@ -198,7 +200,7 @@ class Pagination {
         // console.log(`sliceItems: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
 
         let paginatedItems = this.computeSlice(
-                    this.items, this.current_page, this.rows_per_page);
+            this.items, this.current_page, this.rows_per_page);
         this.pushParentFolder(paginatedItems);
 
         if (update) {
@@ -210,6 +212,7 @@ class Pagination {
                 base.$content.find('.nav_buttons').rmCls('hidden');
                 this.active = true;
             }
+            console.log(`SliceItems(${page}) pagination ${this.active ? 'active' : 'inactive'}`);
             this.view.doSetItems(paginatedItems);
         }
         // this.current_items = paginatedItems;
@@ -225,6 +228,18 @@ class Pagination {
 		let start = rows_per_page * page;
 		let end = start + rows_per_page;
 		return items.slice(start, end);
+    }
+
+    sort(fn){
+        this.items = values(this.item.content).sort(fn);
+        // event.pub('pagination.refreshed', this.item, [], []);
+    }
+
+    initial_sort(){
+        sort = require('../ext/sort');
+        this.sort(sort.getSortPref());
+        page = (this.current_page <= this.last_page) ? this.current_page : this.last_page;
+        this.sliceItems(page, false);
     }
 }
 
