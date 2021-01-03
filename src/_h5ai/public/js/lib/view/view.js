@@ -186,7 +186,7 @@ const checkHint = () => {
 };
 
 const setItems = items => {
-    displayItems = items;
+    displayItems = items; //FIXME: make a copy instead of ref? (slice(0))
 
     // Destroy previous buttons if they exist
     if (page_nav){
@@ -196,8 +196,8 @@ const setItems = items => {
     }
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
 
-    if (displayItems.length > pagination.getCachedPref()) {
-        page_nav = new pagination.Pagination(displayItems, payload, module.exports);
+    if (items.length > pagination.getCachedPref()) {
+        page_nav = new pagination.Pagination(items, payload, module.exports);
         page_nav.sliceItems(1);
     } else {
         doSetItems(items);
@@ -240,7 +240,7 @@ const onLocationChanged = item => {
         item = location.getItem();
     }
 
-    payload = item; // caching for reuse
+    payload = item; // caching for reuse, make copy?
 
     const items = filterPayload(item);
 
@@ -273,11 +273,10 @@ const onPaginationUpdated = (pref) => {
     }
     page_nav.rows_per_page = pref;
     let count = page_nav.computeTotalPages();
-    console.log(`count received: ${count}`);
+    console.log(`recomputed total pages: ${count}`);
 
     page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
-    console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
-
+    // console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
     page_nav.sliceItems(page);
 }
 
@@ -291,32 +290,28 @@ const onLocationRefreshed = (item, added, removed) => {
     // Block if pagination is active
     console.log(`Refresh->items.len=${values(item.content).length}, pref: ${pagination.getCachedPref()}`);
     if (values(item.content).length > pagination.getCachedPref()) {
-        if (!page_nav){
-            page_nav = new pagination.Pagination(values(item.content), payload, module.exports);
-            page_nav.sliceItems(1);
+        if (page_nav){
+            page_nav.item = payload;
+            page_nav.setItems(filterPayload(item));
+            // page_nav.computeTotalPages();
+            page_nav.initial_sort(true);
+            // page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
+            // page_nav.sliceItems(page)
             return;
         }
-        page_nav.item = payload;
-        page_nav.items = filterPayload(item);
-        if(page_nav.isActive()){
-            console.log("page nav is active! slicing new items");
-            page_nav.computeTotalPages();
-            page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
-            page_nav.sliceItems(page);
-        } else {
-            console.log("page_nav not active, but needed!");
-            page_nav.computeTotalPages();
-            page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
-            page_nav.sliceItems(page);
-        }
+        page_nav = new pagination.Pagination(filterPayload(item), payload, module.exports);
+        page_nav.sliceItems(1);
         return;
     } else {
         // FIXME needs improvement
         // We recreate the items and remove ourselves to leave the default logic do its thing
         if (page_nav){
+            console.log(`location refresh, page obj exist...`);
             if (page_nav.isActive()){
-                page_nav.items = values(item.content);
-                page_nav.computeTotalPages();
+                console.log(`location refresh, page obj active, slicing to 1`);
+                // page_nav.items = values(item.content);
+                page_nav.setItems(filterPayload(item));
+                // page_nav.computeTotalPages();
                 page_nav.sliceItems(1);
             }
             page_nav.buttons.forEach(e => e.remove());
@@ -375,6 +370,7 @@ const getPag = () => {
 module.exports = {
     $el: $view,
     getPag,
+    filterPayload,
     setItems,
     doSetItems,
     changeItems,

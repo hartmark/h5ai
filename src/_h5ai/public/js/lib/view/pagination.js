@@ -1,19 +1,15 @@
 const {each, includes, dom, values} = require('../util');
 const event = require('../core/event');
-// const location = require('../core/location');
 const store = require('../core/store');
 const allsettings = require('../core/settings');
 const base = require('./base');
-// const view = require('./view');
-const sidebar = require('./sidebar');
 
 const paginationItems = [100, 0, 50, 250, 500];
 const settings = Object.assign({
     paginationItems,
     hideParentFolder: false,
 }, allsettings.view);
-// FIXME write function to make sure paginationItems is not empty
-const defaultSize = settings.paginationItems[0];
+const defaultSize = settings.paginationItems.length ? settings.paginationItems[0] : 0;
 const sortedSizes = [...new Set(settings.paginationItems)].sort((a, b) => a - b)
 const storekey = 'pagination';
 const paginationTpl =
@@ -21,16 +17,14 @@ const paginationTpl =
             <div id="nav_btm" class="nav_buttons"></div>
         </div>`;
 const selectorTpl =
-`
-<div id="pag_sidebar" class="block">
-<h1 class="l10n-pagination">Pagination</h1>
-    <form id="pag_form">
-        <select id="pag_select" name='Pagination size'>
-        </select>
-        <noscript><input type="submit" value="Submit"></noscript>
-    </form>
-</div>
-`
+        `<div id="pag_sidebar" class="block">
+        <h1 class="l10n-pagination">Pagination</h1>
+            <form id="pag_form">
+                <select id="pag_select" name='Pagination size'>
+                </select>
+                <noscript><input type="submit" value="Submit"></noscript>
+            </form>
+        </div>`;
 const $pagination = dom(paginationTpl);
 const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['btn_last', '>>']];
 let sizePref;
@@ -40,22 +34,31 @@ class Pagination {
 		this.view = view;
         this.rows_per_page = getPref();
         this.item = item;
-        this.items = items;
+        // this.items = items;
+        this.setItems(items);
         this.current_page = 1;
         this.current_items;
-        this.popParentFolder();
-        this.computeTotalPages();
+        // this.popParentFolder();
+        // this.computeTotalPages();
         this.buttons = [];
         this.$pagination_els = base.$content.find('.nav_buttons');
         this.setupPagination(items, this.$pagination_els);
         this.active = true;
+        this.sortfn = require('../ext/sort').getSortPref;
         this.initial_sort();
     }
     get next_page() { return (this.current_page + 1); }
     get prev_page() { return (this.current_page - 1); }
     get last_page() { return this.page_count; }
 
+    setItems(array) {
+        this.items = array;
+        this.popParentFolder();
+        this.computeTotalPages();
+    }
+
     isActive() {
+        // FIXME need more checks?
         return this.active;
     }
 
@@ -72,12 +75,12 @@ class Pagination {
 
     popParentFolder() {
         if (this.items.length > 0 && !settings.hideParentFolder){
-            let first = this.items.shift();
-            this.parentFolder = first;
-            console.log(`shifted items ${items}, parent ${this.parentFolder}`);
+            this.parentFolder = this.items.shift();
+            console.log(`popParentFolder: parentFolder = ${this.parentFolder.label}`);
             return;
         }
         this.parentFolder = undefined;
+        console.log(`popParentFolder: parentFolder ${this.parentFolder}`);
     }
 
     pushParentFolder(items) {
@@ -191,6 +194,20 @@ class Pagination {
 		return {page_input: input_field, go_btn: input_btn};
 	}
 
+    refreshItems(payload) {
+        this.item = payload;
+        this.items = this.view.filterPayload(payload);
+        if (this.isActive()){
+            this.computeTotalPages();
+
+        }
+
+    }
+
+    refreshMaxPage(){
+
+    }
+
 	sliceItems(page, update = true) {
 		page = this.set_current_page(page); // FIXME can be improved
 		if (isNaN(page)) {
@@ -235,11 +252,10 @@ class Pagination {
         // event.pub('pagination.refreshed', this.item, [], []);
     }
 
-    initial_sort(){
-        sort = require('../ext/sort');
-        this.sort(sort.getSortPref());
+    initial_sort(update = false){
+        this.sort(this.sortfn());
         page = (this.current_page <= this.last_page) ? this.current_page : this.last_page;
-        this.sliceItems(page, false);
+        this.sliceItems(page, update);
     }
 }
 
@@ -310,18 +326,27 @@ const destroyNavBar = (el) => {
 };
 
 // Return an array of selectable options for the select list
-const addOptions = () => {
-    var options = [];
+const addOptions = (cached_pref) => {
+    let options = [];
+    if (cached_pref === undefined){
+        cached_pref = defaultSize;
+    }
+    let has_set = false;
     // TODO translations needed here
     for (let size of sortedSizes){
+        let element;
         let label = size === 0? 'ALL' :`${size} per page`;
-        let element = size === defaultSize ?
-            `<option selected value="${size}">${label}</option>` :
-            `<option value="${size}">${label}</option>`
+        if (size === cached_pref && !has_set) {
+            element = `<option selected value="${size}">${label}</option>`;
+            has_set = true;
+        } else {
+            element = `<option value="${size}">${label}</option>`;
+        }
         options.push(element);
     }
     return options;
 }
+
 
 function onSelect() {
     console.log(`selected ${this.value}`);
@@ -345,7 +370,9 @@ const addSelector = () => {
         document.querySelector('#pag_select')
             .addEventListener('change', onSelect);
 
-        for (let item of addOptions()) {
+        let cached_pref = getCachedPref();
+
+        for (let item of addOptions(cached_pref)) {
             dom(item).appTo('#pag_select');
         }
     }
@@ -354,9 +381,8 @@ const addSelector = () => {
 const setPref = (size) => {
 	const stored = store.get(storekey);
 	size = (size !== undefined) ? size : stored ? stored : defaultSize;
-    size = includes(settings.paginationItems, size) ?
-        size :
-        defaultSize; //FIXME probably shouldn't store anything instead?
+    size = includes(settings.paginationItems, size) ? size :
+                defaultSize; //FIXME probably shouldn't store anything instead?
     console.log(`setPref: storing pagination size ${size}`);
 	store.put(storekey, size);
 }

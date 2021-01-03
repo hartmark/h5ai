@@ -8,6 +8,7 @@ const reEndsWithSlash = /\/$/;
 const reSplitPath = /^(.*\/)([^\/]+\/?)$/;
 const cache = {};
 
+
 const startsWith = (sequence, part) => isStr(sequence) && sequence.startsWith(part);
 
 const createLabel = sequence => {
