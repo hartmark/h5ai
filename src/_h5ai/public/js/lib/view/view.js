@@ -47,7 +47,7 @@ const itemTpl =
 const $view = dom(viewTpl);
 const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
-let page_nav;
+// let page_nav;
 let displayItems;
 let payload;
 
@@ -189,16 +189,18 @@ const setItems = items => {
     displayItems = items; //FIXME: make a copy instead of ref? (slice(0))
 
     // Destroy previous buttons if they exist
-    if (page_nav){
-        page_nav.buttons.forEach(e => e.remove());
-        delete page_nav.buttons;
-        page_nav = undefined;
-    }
+    // if (pagination.inst){
+    //     pagination.inst.buttons.forEach(e => e.remove());
+    //     delete pagination.inst.buttons;
+        // pagination.inst = undefined;
+    // }
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
+    pagination.inst.clear()
 
     if (items.length > pagination.getCachedPref()) {
-        page_nav = new pagination.Pagination(items, payload, module.exports);
-        page_nav.sliceItems(1);
+        // page_nav = new pagination.Pagination(items, payload, module.exports);
+        pagination.inst.init(items, payload, module.exports);
+        pagination.inst.sliceItems(1);
     } else {
         doSetItems(items);
     }
@@ -264,20 +266,22 @@ const filterPayload = item => {
     return items;
 }
 
+// TODO move to pagination module, no need to keep here
 const onPaginationUpdated = (pref) => {
-    if (!page_nav) {
-        page_nav = new pagination.Pagination(displayItems, payload, module.exports);
-        page_nav.rows_per_page = pref;
-        page_nav.sliceItems(1);
+    if (!pagination.inst.isActive()) {
+        // page_nav = new pagination.Pagination(displayItems, payload, module.exports);
+        pagination.inst.init(displayItems, payload, module.exports);
+        pagination.inst.rows_per_page = pref;
+        pagination.inst.sliceItems(1);
         return;
     }
-    page_nav.rows_per_page = pref;
-    let count = page_nav.computeTotalPages();
+    pagination.inst.rows_per_page = pref;
+    let count = pagination.inst.computeTotalPages();
     console.log(`recomputed total pages: ${count}`);
 
-    page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
+    page = (pagination.inst.current_page <= pagination.inst.last_page) ? pagination.inst.current_page : pagination.inst.last_page;
     // console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
-    page_nav.sliceItems(page);
+    pagination.inst.sliceItems(page);
 }
 
 const onLocationRefreshed = (item, added, removed) => {
@@ -290,33 +294,34 @@ const onLocationRefreshed = (item, added, removed) => {
     // Block if pagination is active
     console.log(`Refresh->items.len=${values(item.content).length}, pref: ${pagination.getCachedPref()}`);
     if (values(item.content).length > pagination.getCachedPref()) {
-        if (page_nav){
-            page_nav.item = payload;
-            page_nav.setItems(filterPayload(item));
+        if (pagination.inst.isActive()){
+            pagination.inst.item = payload;
+            pagination.inst.setItems(filterPayload(item));
             // page_nav.computeTotalPages();
-            page_nav.initial_sort(true);
+            pagination.inst.initial_sort(true);
             // page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
             // page_nav.sliceItems(page)
             return;
         }
-        page_nav = new pagination.Pagination(filterPayload(item), payload, module.exports);
-        page_nav.sliceItems(1);
+        pagination.inst.init(filterPayload(item), payload, module.exports);
+        pagination.inst.sliceItems(1);
         return;
     } else {
         // FIXME needs improvement
         // We recreate the items and remove ourselves to leave the default logic do its thing
-        if (page_nav){
+        if (pagination.inst){
             console.log(`location refresh, page obj exist...`);
-            if (page_nav.isActive()){
+            if (pagination.inst.isActive()){
                 console.log(`location refresh, page obj active, slicing to 1`);
                 // page_nav.items = values(item.content);
-                page_nav.setItems(filterPayload(item));
+                pagination.inst.setItems(filterPayload(item));
                 // page_nav.computeTotalPages();
-                page_nav.sliceItems(1);
+                pagination.inst.sliceItems(1);
             }
-            page_nav.buttons.forEach(e => e.remove());
-            delete page_nav.buttons;
-            page_nav = undefined;
+            // pagination.inst.buttons.forEach(e => e.remove());
+            // delete pagination.inst.buttons;
+            // pagination.inst = undefined;
+            pagination.inst.clear();
         }
     }
 
@@ -383,3 +388,5 @@ module.exports = {
     getSize,
     setSize
 };
+
+pagination.setView(module.exports);

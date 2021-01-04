@@ -4,6 +4,7 @@ const resource = require('../core/resource');
 const allsettings = require('../core/settings');
 const store = require('../core/store');
 const view = require('../view/view');
+const pagination = require('../view/pagination');
 
 const settings = Object.assign({
     enabled: false,
@@ -59,18 +60,18 @@ const sortItems = (column, reverse) => {
     $headers.rmCls('ascending').rmCls('descending');
     $header.addCls(reverse ? 'descending' : 'ascending');
 
-    let pag = view.getPag();
-    if (pag && pag.isActive()){
-        pag.sort(fn);
-        page = (pag.current_page <= pag.last_page) ? pag.current_page : pag.last_page;
-        pag.sliceItems(page);
+    if (pagination.inst.isActive()){
+        pagination.inst.sort(fn);
+        page = (pagination.inst.current_page <= pagination.inst.last_page) ? pagination.inst.current_page : pagination.inst.last_page;
+        pagination.inst.sliceItems(page);
         return;
     }
     dom(toArray(dom('#items .item:not(.folder-parent)')).sort(fn)).appTo('#items');
 };
 
 const onContentChanged = () => {
-    if (view.getPag() && view.getPag().isActive()){
+    // if (view.getPag() && view.getPag().isActive()){
+    if (pagination.inst.isActive()){
         console.log("sort.onContentChanged() blocked!");
         return;
     }

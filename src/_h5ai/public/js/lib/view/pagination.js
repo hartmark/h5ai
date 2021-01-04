@@ -30,7 +30,26 @@ const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['bt
 let sizePref;
 
 class Pagination {
-    constructor(items, item, view) {
+    constructor(){
+        console.log(`Constructed Pagination object: ${this}`);
+		this.view;
+        this.rows_per_page = getPref();
+        this.item;
+        // this.items = items;
+        // this.setItems(items);
+        this.current_page = 1;
+        this.current_items;
+        // this.popParentFolder();
+        // this.computeTotalPages();
+        this.buttons = [];
+        this.$pagination_els;
+        // this.setupPagination(items, this.$pagination_els);
+        this.active = false;
+        // this.sortfn = require('../ext/sort').getSortPref;
+        // this.initial_sort();
+    }
+
+    init(items, item, view) {
 		this.view = view;
         this.rows_per_page = getPref();
         this.item = item;
@@ -47,6 +66,16 @@ class Pagination {
         this.sortfn = require('../ext/sort').getSortPref;
         this.initial_sort();
     }
+    
+    clear() {
+        if (this.active){
+            this.buttons.forEach(e => e.remove());
+            delete this.buttons;
+            // this.buttons = [];
+        }
+        this.active = false;
+    }
+
     get next_page() { return (this.current_page + 1); }
     get prev_page() { return (this.current_page - 1); }
     get last_page() { return this.page_count; }
@@ -411,7 +440,16 @@ const getPref = () => {
     return sizePref;
 };
 
+// Singleton to keep things simple
+const inst = new Pagination();
+
+const setView = (view) => {
+    inst.view = view;
+    console.log(`set view: ${inst.view}`);
+}
+
 const init = () => {
+    console.log("init from pagination");
     setPref();
     getPref();
     event.sub('location.changed', onLocationChanged);
@@ -423,5 +461,7 @@ module.exports = {
 	$el: $pagination,
     getPref,
     getCachedPref,
-	Pagination
+    Pagination,
+    inst,
+    setView,
 }
