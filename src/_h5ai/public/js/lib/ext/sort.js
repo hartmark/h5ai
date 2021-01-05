@@ -60,10 +60,10 @@ const sortItems = (column, reverse) => {
     $headers.rmCls('ascending').rmCls('descending');
     $header.addCls(reverse ? 'descending' : 'ascending');
 
-    if (pagination.inst.isActive()){
-        pagination.inst.sort(fn);
-        page = (pagination.inst.current_page <= pagination.inst.last_page) ? pagination.inst.current_page : pagination.inst.last_page;
-        pagination.inst.sliceItems(page);
+    if (pagination.isActive()){
+        pagination.sort(fn);
+        page = pagination.getNewCurrentPage();
+        pagination.sliceItems(page);
         return;
     }
     dom(toArray(dom('#items .item:not(.folder-parent)')).sort(fn)).appTo('#items');
@@ -71,7 +71,7 @@ const sortItems = (column, reverse) => {
 
 const onContentChanged = () => {
     // if (view.getPag() && view.getPag().isActive()){
-    if (pagination.inst.isActive()){
+    if (pagination.isActive()){
         console.log("sort.onContentChanged() blocked!");
         return;
     }

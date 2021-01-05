@@ -47,7 +47,6 @@ const itemTpl =
 const $view = dom(viewTpl);
 const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
-// let page_nav;
 let displayItems;
 let payload;
 
@@ -186,7 +185,7 @@ const checkHint = () => {
 };
 
 const setItems = items => {
-    displayItems = items; //FIXME: make a copy instead of ref? (slice(0))
+    displayItems = items.slice(0); //FIXME: make a copy instead of ref? (slice(0))
 
     // Destroy previous buttons if they exist
     // if (pagination.inst){
@@ -195,12 +194,12 @@ const setItems = items => {
         // pagination.inst = undefined;
     // }
     // each($view.find('.nav_buttons'), el => destroyNavBar(el));
-    pagination.inst.clear()
+    pagination.clear()
 
     if (items.length > pagination.getCachedPref()) {
         // page_nav = new pagination.Pagination(items, payload, module.exports);
-        pagination.inst.init(items, payload, module.exports);
-        pagination.inst.sliceItems(1);
+        pagination.setup(displayItems.slice(0), payload);
+        pagination.sliceItems(1);
     } else {
         doSetItems(items);
     }
@@ -268,20 +267,18 @@ const filterPayload = item => {
 
 // TODO move to pagination module, no need to keep here
 const onPaginationUpdated = (pref) => {
-    if (!pagination.inst.isActive()) {
+    console.log(`Pagination updated, isActive? ${pagination.isActive()}`);
+    if (!pagination.isActive()) {
         // page_nav = new pagination.Pagination(displayItems, payload, module.exports);
-        pagination.inst.init(displayItems, payload, module.exports);
-        pagination.inst.rows_per_page = pref;
-        pagination.inst.sliceItems(1);
+        pagination.setup(displayItems.slice(0), payload);
+        pagination.setNumRows(pref);
+        pagination.sliceItems(1);
         return;
     }
-    pagination.inst.rows_per_page = pref;
-    let count = pagination.inst.computeTotalPages();
-    console.log(`recomputed total pages: ${count}`);
-
-    page = (pagination.inst.current_page <= pagination.inst.last_page) ? pagination.inst.current_page : pagination.inst.last_page;
+    pagination.setNumRows(pref);
+    page = pagination.getNewCurrentPage();
     // console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
-    pagination.inst.sliceItems(page);
+    pagination.sliceItems(page);
 }
 
 const onLocationRefreshed = (item, added, removed) => {
@@ -294,34 +291,34 @@ const onLocationRefreshed = (item, added, removed) => {
     // Block if pagination is active
     console.log(`Refresh->items.len=${values(item.content).length}, pref: ${pagination.getCachedPref()}`);
     if (values(item.content).length > pagination.getCachedPref()) {
-        if (pagination.inst.isActive()){
-            pagination.inst.item = payload;
-            pagination.inst.setItems(filterPayload(item));
+        if (pagination.isActive()){
+            pagination.setPayload(payload);
+            pagination.updateItems(filterPayload(item));
             // page_nav.computeTotalPages();
-            pagination.inst.initial_sort(true);
+            pagination.initial_sort(true);
             // page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
             // page_nav.sliceItems(page)
             return;
         }
-        pagination.inst.init(filterPayload(item), payload, module.exports);
-        pagination.inst.sliceItems(1);
+        pagination.setup(filterPayload(item), payload);
+        pagination.sliceItems(1);
         return;
     } else {
         // FIXME needs improvement
         // We recreate the items and remove ourselves to leave the default logic do its thing
-        if (pagination.inst){
+        if (pagination){
             console.log(`location refresh, page obj exist...`);
-            if (pagination.inst.isActive()){
+            if (pagination.isActive()){
                 console.log(`location refresh, page obj active, slicing to 1`);
                 // page_nav.items = values(item.content);
-                pagination.inst.setItems(filterPayload(item));
+                pagination.updateItems(filterPayload(item));
                 // page_nav.computeTotalPages();
-                pagination.inst.sliceItems(1);
+                pagination.sliceItems(1);
             }
             // pagination.inst.buttons.forEach(e => e.remove());
             // delete pagination.inst.buttons;
             // pagination.inst = undefined;
-            pagination.inst.clear();
+            pagination.clear();
         }
     }
 
@@ -389,4 +386,6 @@ module.exports = {
     setSize
 };
 
+// We need to load pagination first, then export our methods here
+// TODO improve explanation
 pagination.setView(module.exports);

@@ -29,264 +29,296 @@ const $pagination = dom(paginationTpl);
 const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['btn_last', '>>']];
 let sizePref;
 
-class Pagination {
-    constructor(){
-        console.log(`Constructed Pagination object: ${this}`);
-		this.view;
-        this.rows_per_page = getPref();
-        this.item;
-        // this.items = items;
-        // this.setItems(items);
-        this.current_page = 1;
-        this.current_items;
-        // this.popParentFolder();
-        // this.computeTotalPages();
-        this.buttons = [];
-        this.$pagination_els;
-        // this.setupPagination(items, this.$pagination_els);
-        this.active = false;
-        // this.sortfn = require('../ext/sort').getSortPref;
-        // this.initial_sort();
+const setPref = (size) => {
+	const stored = store.get(storekey);
+	size = (size !== undefined) ? size : stored ? stored : defaultSize;
+    size = includes(settings.paginationItems, size) ? size :
+                defaultSize; //FIXME probably shouldn't store anything instead?
+    console.log(`setPref: storing pagination size ${size}`);
+	store.put(storekey, size);
+}
+
+const getPref = () => {
+    let pref;
+    try {
+        pref = store.get(storekey);
+    } catch (error) {
+        console.log("Exception getting size pref:", error);
+        pref = undefined;
     }
-
-    init(items, item, view) {
-		this.view = view;
-        this.rows_per_page = getPref();
-        this.item = item;
-        // this.items = items;
-        this.setItems(items);
-        this.current_page = 1;
-        this.current_items;
-        // this.popParentFolder();
-        // this.computeTotalPages();
-        this.buttons = [];
-        this.$pagination_els = base.$content.find('.nav_buttons');
-        this.setupPagination(items, this.$pagination_els);
-        this.active = true;
-        this.sortfn = require('../ext/sort').getSortPref;
-        this.initial_sort();
+    console.log(`After getting pref: ${pref}`);
+    if (pref === undefined) {
+        sizePref = defaultSize;
+    } else {
+        sizePref = parseInt(pref, 10);
+        setPref(sizePref);
     }
-    
-    clear() {
-        if (this.active){
-            this.buttons.forEach(e => e.remove());
-            delete this.buttons;
-            // this.buttons = [];
-        }
-        this.active = false;
+    return sizePref;
+};
+
+console.log(`Required Pagination module...`);
+let pag_view;
+let rows_per_page = getPref();
+let pag_payload;
+let pag_items;
+// this.items = items;
+// this.setItems(items);
+let current_page = 1;
+let current_items;
+// this.popParentFolder();
+// this.computeTotalPages();
+let buttons = [];
+let $pagination_els;
+// this.setupNavigation(items, this.$pagination_els);
+let active = false;
+// this.sortfn = require('../ext/sort').getSortPref;
+// this.initial_sort();
+let page_count = 0;
+let parentFolder;
+
+const setup = (items, item) => {
+    console.log(`Pagination setup()`);
+    // rows_per_page = getPref();
+    pag_payload = item;
+    // this.items = items;
+    updateItems(items);
+    current_page = 1;
+    current_items;
+    // this.popParentFolder();
+    // this.computeTotalPages();
+    buttons = [];
+    $pagination_els = base.$content.find('.nav_buttons');
+    setupNavigation(items, $pagination_els);
+    active = true;
+    sortfn = require('../ext/sort').getSortPref;
+    initial_sort();
+}
+
+const clear = () => {
+    console.log("Pagination clear()");
+    if (active){
+        buttons.forEach(e => e.remove());
+        // delete buttons;
+        buttons = [];
     }
+    active = false;
+}
 
-    get next_page() { return (this.current_page + 1); }
-    get prev_page() { return (this.current_page - 1); }
-    get last_page() { return this.page_count; }
+const first_page = () => { return 1; }
+const next_page = () => { return (current_page + 1); }
+const prev_page = () => { return (current_page - 1); }
+const last_page = () => { return page_count; }
 
-    setItems(array) {
-        this.items = array;
-        this.popParentFolder();
-        this.computeTotalPages();
+const updateItems = (items) => {
+    pag_items = items;
+    popParentFolder(pag_items);
+    computeTotalPages();
+}
+
+const isActive = () => {
+    // FIXME need more checks?
+    return active;
+}
+
+const popParentFolder = (items) => {
+    if (items.length > 0 && !settings.hideParentFolder){
+        parentFolder = items.shift();
+        console.log(`popParentFolder: parentFolder = ${parentFolder.label}`);
+        return;
     }
+    parentFolder = undefined;
+    console.log(`popParentFolder: parentFolder ${parentFolder}`);
+}
 
-    isActive() {
-        // FIXME need more checks?
-        return this.active;
+//TODO put this in a setter for this.items to compute automatically when it's modified
+const computeTotalPages = () => {
+    console.log(`computeTotalPages: rows_per_page ${rows_per_page}`);
+    if (rows_per_page == 0){
+        page_count = 1;
+        return 1;
     }
+    page_count = Math.ceil(pag_items.length / rows_per_page);
+    console.log(`Computed page count: ${page_count}`);
+    return page_count;
+}
 
-    //TODO put this in a setter for this.items to compute automatically when it's modified
-    computeTotalPages() {
-        if (this.rows_per_page == 0){
-            this.page_count = 1;
-            return 1;
-        }
-        this.page_count = Math.ceil(this.items.length / this.rows_per_page);
-        console.log(`Computed page count: ${this.page_count}`);
-        return this.page_count;
-    }
 
-    popParentFolder() {
-        if (this.items.length > 0 && !settings.hideParentFolder){
-            this.parentFolder = this.items.shift();
-            console.log(`popParentFolder: parentFolder = ${this.parentFolder.label}`);
-            return;
-        }
-        this.parentFolder = undefined;
-        console.log(`popParentFolder: parentFolder ${this.parentFolder}`);
-    }
-
-    pushParentFolder(items) {
-        if (this.parentFolder && items[0] !== this.parentFolder) {
-            items.unshift(this.parentFolder);
-        }
-    }
-
-    set_current_page(page) {
-        const parsed = parseInt(page, 10);
-        if (!isNaN(parsed)) {
-            this.current_page = parsed;
-        }
-        return parsed;
-    };
-
-    setupPagination(items, wrapper) {
-        each(wrapper, key => {
-            key.innerHTML = "";
-        });
-
-        for (let i = 0; i < btn_cls.length; i++) {
-            each(wrapper, key => {
-                let btn = paginationButton(btn_cls[i], this);
-                key.appendChild(btn);
-                this.buttons.push(btn);
-            });
-        }
-
-        each(wrapper, key => {
-            // Page status
-            let div = this.updatePageStatus(null);
-            key.insertBefore(div, key.childNodes[2]);
-            this.buttons.push(div);
-
-            // Page number selection
-            div = document.createElement('div');
-            div.classList.add('page_input');
-            let {page_input, go_btn} = this.pageInputForm(items);
-            div.appendChild(page_input);
-            div.appendChild(go_btn);
-            key.appendChild(div);
-            this.buttons.push(page_input);
-            this.buttons.push(go_btn);
-        });
-	}
-
-	updateButtons() {
-		let prev_buttons =  document.querySelectorAll('#btn_first, #btn_prev');
-		let next_buttons =  document.querySelectorAll('#btn_next, #btn_last');
-		if (this.current_page <= 1) {
-			each(prev_buttons, button => button.disabled = true);
-			each(next_buttons, button => button.disabled = false);
-		} else if (this.current_page >= this.page_count && this.current_page > 1) {
-			each(next_buttons, button => button.disabled = true);
-			each(prev_buttons, button => button.disabled = false);
-		} else {
-			let nav_buttons = document.querySelectorAll('#btn_first, #btn_prev, #btn_next, #btn_last');
-			each(nav_buttons, button => button.disabled = false);
-		}
-		let page_pos = document.querySelectorAll('.page_pos');
-		each(page_pos, el => this.updatePageStatus(el));
-	}
-
-	updatePageStatus(div) {
-        _str = this.current_page.toString()
-            .concat('/', this.page_count.toString());
-		if (!div) {
-			div = document.createElement('div');
-			div.appendChild(document.createTextNode(_str));
-			div.classList.add('page_pos');
-			return div;
-		}
-		return div.innerText = _str;
-	}
-
-	pageInputForm() {
-		let input_field = document.createElement('input');
-		input_field.type = 'text';
-		input_field.classList.add('page_input_text');
-		input_field.placeholder = 'page';
-
-		let input_btn = document.createElement('input');
-		input_btn.type = 'button';
-		input_btn.classList.add('page_input_button');
-		input_btn.value = 'GO';
-		input_btn.addEventListener('click', () => {
-			if (input_field.value !== '' && input_field.value !== this.current_page) {
-				this.sliceItems(input_field.value);
-			}
-			input_field.value = "";
-			input_field.focus();
-		});
-
-		input_field.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' && input_field.value && !/[^\s]/.test(input_field.value)) {
-				if (input_field.value !== this.current_page) {
-					e.preventDefault();
-					this.sliceItems(input_field.value);
-				}
-				input_field.value = "";
-				input_field.focus();
-			};
-		});
-
-		// Only allow digits, Enter and max page, no leading zero or spaces
-		setInputFilter(input_field, (value) => {
-			return /^[^0\s][\d]*$/.test(value) && value <= this.page_count;
-		});
-
-		return {page_input: input_field, go_btn: input_btn};
-	}
-
-    refreshItems(payload) {
-        this.item = payload;
-        this.items = this.view.filterPayload(payload);
-        if (this.isActive()){
-            this.computeTotalPages();
-
-        }
-
-    }
-
-    refreshMaxPage(){
-
-    }
-
-	sliceItems(page, update = true) {
-		page = this.set_current_page(page); // FIXME can be improved
-		if (isNaN(page)) {
-            console.log(`Page ${page} is NaN!`);
-			return;
-        }
-        // console.log(`sliceItems: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
-
-        let paginatedItems = this.computeSlice(
-            this.items, this.current_page, this.rows_per_page);
-        this.pushParentFolder(paginatedItems);
-
-        if (update) {
-            this.updateButtons();
-            if (this.last_page <= 1) {
-                base.$content.find('.nav_buttons').addCls('hidden');
-                this.active = false;
-            } else {
-                base.$content.find('.nav_buttons').rmCls('hidden');
-                this.active = true;
-            }
-            console.log(`SliceItems(${page}) pagination ${this.active ? 'active' : 'inactive'}`);
-            this.view.doSetItems(paginatedItems);
-        }
-        // this.current_items = paginatedItems;
-        // return paginatedItems;
-    }
-
-    computeSlice(items, page, rows_per_page){
-        // FIXME this returns either a ref to items, or a shallow copy (the slice)
-        if (!rows_per_page){
-            return items;
-        }
-        page--;
-		let start = rows_per_page * page;
-		let end = start + rows_per_page;
-		return items.slice(start, end);
-    }
-
-    sort(fn){
-        this.items = values(this.item.content).sort(fn);
-        // event.pub('pagination.refreshed', this.item, [], []);
-    }
-
-    initial_sort(update = false){
-        this.sort(this.sortfn());
-        page = (this.current_page <= this.last_page) ? this.current_page : this.last_page;
-        this.sliceItems(page, update);
+const pushParentFolder = (items) => {
+    if (parentFolder && items[0] !== parentFolder) {
+        items.unshift(parentFolder);
     }
 }
+
+const set_current_page = (page) => {
+    const parsed = parseInt(page, 10);
+    if (!isNaN(parsed)) {
+        current_page = parsed;
+    }
+    return parsed;
+};
+
+const setupNavigation = (items, wrapper) => {
+    each(wrapper, key => {
+        key.innerHTML = "";
+    });
+
+    for (let i = 0; i < btn_cls.length; i++) {
+        each(wrapper, key => {
+            let btn = paginationButton(btn_cls[i], this);
+            key.appendChild(btn);
+            buttons.push(btn);
+        });
+    }
+
+    each(wrapper, key => {
+        // Page status numbers
+        let div = updatePageStatus(null);
+        key.insertBefore(div, key.childNodes[2]);
+        buttons.push(div);
+
+        // Manual page number selection
+        div = document.createElement('div');
+        div.classList.add('page_input');
+        let {page_input, go_btn} = pageInputForm(items);
+        div.appendChild(page_input);
+        div.appendChild(go_btn);
+        key.appendChild(div);
+        buttons.push(page_input);
+        buttons.push(go_btn);
+    });
+}
+
+const updateButtons = () => {
+    let prev_buttons =  document.querySelectorAll('#btn_first, #btn_prev');
+    let next_buttons =  document.querySelectorAll('#btn_next, #btn_last');
+    if (current_page <= 1) {
+        each(prev_buttons, button => button.disabled = true);
+        each(next_buttons, button => button.disabled = false);
+    } else if (current_page >= page_count && current_page > 1) {
+        each(next_buttons, button => button.disabled = true);
+        each(prev_buttons, button => button.disabled = false);
+    } else {
+        let nav_buttons = document.querySelectorAll('#btn_first, #btn_prev, #btn_next, #btn_last');
+        each(nav_buttons, button => button.disabled = false);
+    }
+    let page_pos = document.querySelectorAll('.page_pos');
+    each(page_pos, el => updatePageStatus(el));
+}
+
+const updatePageStatus = (div) => {
+    _str = current_page.toString()
+        .concat('/', page_count.toString());
+    if (!div) {
+        div = document.createElement('div');
+        div.appendChild(document.createTextNode(_str));
+        div.classList.add('page_pos');
+        return div;
+    }
+    return div.innerText = _str;
+}
+
+const pageInputForm = () => {
+    let input_field = document.createElement('input');
+    input_field.type = 'text';
+    input_field.classList.add('page_input_text');
+    input_field.placeholder = 'page';
+
+    let input_btn = document.createElement('input');
+    input_btn.type = 'button';
+    input_btn.classList.add('page_input_button');
+    input_btn.value = 'GO';
+    input_btn.addEventListener('click', () => {
+        if (input_field.value !== '' && input_field.value !== current_page) {
+            sliceItems(input_field.value);
+        }
+        input_field.value = "";
+        input_field.focus();
+    });
+
+    input_field.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && input_field.value && /[^\s]/.test(input_field.value)) {
+            if (input_field.value !== current_page) {
+                e.preventDefault();
+                sliceItems(input_field.value);
+            }
+            input_field.value = "";
+            input_field.focus();
+        };
+    });
+
+    // Only allow digits, new line and max page, no leading zero or spaces
+    setInputFilter(input_field, (value) => {
+        return /^[^0\s][\d]*$/.test(value) && value <= page_count;
+    });
+
+    return {page_input: input_field, go_btn: input_btn};
+}
+
+const refreshItems = (payload) => {
+    this.pag_payload = payload;
+    this.pag_items = view.filterPayload(pag_payload);
+    if (isActive()){
+        computeTotalPages();
+
+    }
+}
+
+const getNewCurrentPage = () => {
+    page = (current_page <= last_page()) ? current_page : last_page();
+    console.log(`getNewCurrentPage: ${page}`);
+    return page;
+}
+
+const sliceItems = (page, update = true) => {
+    page = set_current_page(page); // FIXME can be improved
+    if (isNaN(page)) {
+        console.log(`Page ${page} is NaN!`);
+        return;
+    }
+    // console.log(`sliceItems: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
+
+    let paginatedItems = computeSlice(
+        pag_items, current_page, rows_per_page);
+    pushParentFolder(paginatedItems);
+
+    if (update) {
+        updateButtons();
+        if (last_page() <= 1) {
+            base.$content.find('.nav_buttons').addCls('hidden');
+            active = false;
+        } else {
+            base.$content.find('.nav_buttons').rmCls('hidden');
+            active = true;
+        }
+        console.log(`SliceItems(${page}) pagination ${active ? 'active' : 'inactive'}`);
+        pag_view.doSetItems(paginatedItems);
+    }
+    // this.current_items = paginatedItems;
+    // return paginatedItems;
+}
+
+const computeSlice = (items, page, rows_per_page) => {
+    // FIXME this returns either a ref to items, or a shallow copy (the slice)
+    if (!rows_per_page){
+        return items;
+    }
+    page--;
+    let start = rows_per_page * page;
+    let end = start + rows_per_page;
+    return items.slice(start, end);
+}
+
+const sort = (fn) => {
+    pag_items = values(pag_payload.content).sort(fn);
+    // event.pub('pagination.refreshed', this.pag_payload, [], []);
+}
+
+const initial_sort = (update = false) => {
+    sort(sortfn());
+    page = getNewCurrentPage();
+    sliceItems(page, update);
+}
+
 
 // Restricts input for the given textbox to the given inputFilter function.
 // In the future we could use beforeinput instead.
@@ -312,7 +344,7 @@ function setInputFilter(textbox, inputFilter) {
     });
 }
 
-const paginationButton = (cls, page_nav) => {
+const paginationButton = (cls) => {
 	let button = document.createElement('button');
     button.innerText = cls[1];
     button.classList.add('nav_button');
@@ -321,23 +353,23 @@ const paginationButton = (cls, page_nav) => {
 
     switch (cls[0]) {
         case 'btn_prev':
-            button.req_page = () => page_nav.prev_page;
+            button.req_page = prev_page;
             button.disabled = true;
             break;
         case 'btn_next':
-            button.req_page = () => page_nav.next_page;
+            button.req_page = next_page;
             button.disabled = false;
             break;
         case 'btn_last':
-            button.req_page = () => page_nav.last_page;
+            button.req_page = last_page;
             button.disabled = false;
             break;
         default: // 'btn_first'
-            button.req_page = () => 1;
+            button.req_page = first_page;
             button.disabled = true;
 	}
 	button.addEventListener('click', function () {
-		page_nav.sliceItems(this.req_page());
+		sliceItems(this.req_page());
 	});
 	return button;
 };
@@ -407,13 +439,8 @@ const addSelector = () => {
     }
 };
 
-const setPref = (size) => {
-	const stored = store.get(storekey);
-	size = (size !== undefined) ? size : stored ? stored : defaultSize;
-    size = includes(settings.paginationItems, size) ? size :
-                defaultSize; //FIXME probably shouldn't store anything instead?
-    console.log(`setPref: storing pagination size ${size}`);
-	store.put(storekey, size);
+const setPayload = (payload) => {
+    pag_payload = payload;
 }
 
 const getCachedPref = () => {
@@ -422,31 +449,16 @@ const getCachedPref = () => {
     return sizePref;
 };
 
-const getPref = () => {
-    let pref;
-    try {
-        pref = store.get(storekey);
-    } catch (error) {
-        console.log("Exception getting size pref:", error);
-        pref = undefined;
-    }
-    console.log(`After getting pref: ${pref}`);
-    if (pref === undefined) {
-        sizePref = defaultSize;
-    } else {
-        sizePref = parseInt(pref, 10);
-        setPref(sizePref);
-    }
-    return sizePref;
-};
-
-// Singleton to keep things simple
-const inst = new Pagination();
-
+// The module won't work if a view is not set first!
 const setView = (view) => {
-    inst.view = view;
-    console.log(`set view: ${inst.view}`);
+    pag_view = view;
 }
+
+const setNumRows = (num) => {
+    rows_per_page = num;
+    computeTotalPages();
+}
+
 
 const init = () => {
     console.log("init from pagination");
@@ -461,7 +473,19 @@ module.exports = {
 	$el: $pagination,
     getPref,
     getCachedPref,
-    Pagination,
-    inst,
+    pag_payload,
+    updateItems,
+    initial_sort,
+    setup,
+    sliceItems,
+    isActive,
+    clear,
+    computeTotalPages,
+    last_page,
+    current_page,
+    setNumRows,
+    setPayload,
+    sort,
     setView,
+    getNewCurrentPage,
 }
