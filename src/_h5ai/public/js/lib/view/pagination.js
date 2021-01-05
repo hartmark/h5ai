@@ -76,10 +76,10 @@ let active = false;
 let page_count = 0;
 let parentFolder;
 
-const setup = (items, item) => {
+const setup = (items) => {
     console.log(`Pagination setup()`);
     // rows_per_page = getPref();
-    pag_payload = item;
+    // pag_payload = item;
     // this.items = items;
     updateItems(items);
     current_page = 1;
@@ -110,6 +110,10 @@ const prev_page = () => { return (current_page - 1); }
 const last_page = () => { return page_count; }
 
 const updateItems = (items) => {
+    if (!items){
+        items = pag_items;
+        return;
+    }
     pag_items = items;
     popParentFolder(pag_items);
     computeTotalPages();
@@ -132,7 +136,7 @@ const popParentFolder = (items) => {
 
 //TODO put this in a setter for this.items to compute automatically when it's modified
 const computeTotalPages = () => {
-    console.log(`computeTotalPages: rows_per_page ${rows_per_page}`);
+    console.log(`computeTotalPages() rows_per_page ${rows_per_page}`);
     if (rows_per_page == 0){
         page_count = 1;
         return 1;
@@ -269,6 +273,7 @@ const getNewCurrentPage = () => {
     return page;
 }
 
+// FIXME take into account the parent dir which counts towards items length
 const sliceItems = (page, update = true) => {
     page = set_current_page(page); // FIXME can be improved
     if (isNaN(page)) {
@@ -413,7 +418,7 @@ function onSelect() {
     console.log(`selected ${this.value}`);
     sizePref = parseInt(this.value, 10);
     setPref(sizePref);
-    event.pub('pagination.pref.changed', sizePref);
+    onPagPrefUpdated(sizePref);
 }
 
 const onLocationChanged = item => {
@@ -459,6 +464,55 @@ const setNumRows = (num) => {
     computeTotalPages();
 }
 
+const onPagPrefUpdated = (pref) => {
+    console.log(`Pagination updated, isActive? ${isActive()}`);
+    if (!isActive()) {
+        // setup(displayItems.slice(0));
+        setup(); // reuse cached items
+        setNumRows(pref);
+        sliceItems(1);
+        return;
+    }
+    setNumRows(pref);
+    page = getNewCurrentPage();
+    // console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
+    sliceItems(page);
+}
+
+const isHandled = (item) => {
+    setPayload(item);
+    // Block if pagination is active
+    console.log(`Refresh->items.len=${values(item.content).length}, pref: ${getCachedPref()}`);
+    if (values(item.content).length > getCachedPref()) {
+        if (isActive()){
+            updateItems(pag_view.filterPayload(item));
+            // page_nav.computeTotalPages();
+            initial_sort(true);
+            return true;
+        }
+        setup(pag_view.filterPayload(item));
+        sliceItems(1);
+        return true;
+    }
+    // we don't need pagination for now...
+    // We recreate the items and remove ourselves to leave the default logic
+    // do its thing
+    if (isActive()){
+        console.log(`WARN: location refresh, pagination Active but not needed anymore...`);
+        // page_nav.items = values(item.content);
+        updateItems(pag_view.filterPayload(item)); //BUG?
+        // page_nav.computeTotalPages();
+        sliceItems(1);
+        // inst.buttons.forEach(e => e.remove());
+        // delete inst.buttons;
+        // inst = undefined;
+        clear();
+        return true;
+    }
+    // We are not interested in handling the items
+    return false;
+}
+
 
 const init = () => {
     console.log("init from pagination");
@@ -488,4 +542,5 @@ module.exports = {
     sort,
     setView,
     getNewCurrentPage,
+    isHandled,
 }

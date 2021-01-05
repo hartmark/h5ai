@@ -47,8 +47,6 @@ const itemTpl =
 const $view = dom(viewTpl);
 const $items = $view.find('#items');
 const $hint = $view.find('#view-hint');
-let displayItems;
-let payload;
 
 const cropSize = (size, min, max) => Math.min(max, Math.max(min, size));
 
@@ -185,20 +183,9 @@ const checkHint = () => {
 };
 
 const setItems = items => {
-    displayItems = items.slice(0); //FIXME: make a copy instead of ref? (slice(0))
-
-    // Destroy previous buttons if they exist
-    // if (pagination.inst){
-    //     pagination.inst.buttons.forEach(e => e.remove());
-    //     delete pagination.inst.buttons;
-        // pagination.inst = undefined;
-    // }
-    // each($view.find('.nav_buttons'), el => destroyNavBar(el));
-    pagination.clear()
-
+    pagination.clear();
     if (items.length > pagination.getCachedPref()) {
-        // page_nav = new pagination.Pagination(items, payload, module.exports);
-        pagination.setup(displayItems.slice(0), payload);
+        pagination.setup(items.slice(0)); // copy displayItems
         pagination.sliceItems(1);
     } else {
         doSetItems(items);
@@ -241,7 +228,7 @@ const onLocationChanged = item => {
         item = location.getItem();
     }
 
-    payload = item; // caching for reuse, make copy?
+    pagination.setPayload(item); // caching for reuse, make copy?
 
     const items = filterPayload(item);
 
@@ -265,61 +252,15 @@ const filterPayload = item => {
     return items;
 }
 
-// TODO move to pagination module, no need to keep here
-const onPaginationUpdated = (pref) => {
-    console.log(`Pagination updated, isActive? ${pagination.isActive()}`);
-    if (!pagination.isActive()) {
-        // page_nav = new pagination.Pagination(displayItems, payload, module.exports);
-        pagination.setup(displayItems.slice(0), payload);
-        pagination.setNumRows(pref);
-        pagination.sliceItems(1);
-        return;
-    }
-    pagination.setNumRows(pref);
-    page = pagination.getNewCurrentPage();
-    // console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
-    pagination.sliceItems(page);
-}
-
 const onLocationRefreshed = (item, added, removed) => {
     console.log(`refresh items: ${item.length} added ${added} length ${added.length} removed ${removed} length ${removed.length}`);
-    payload = item;
+
     if (added.length === 0 && removed.length === 0){
         return;
     }
 
-    // Block if pagination is active
-    console.log(`Refresh->items.len=${values(item.content).length}, pref: ${pagination.getCachedPref()}`);
-    if (values(item.content).length > pagination.getCachedPref()) {
-        if (pagination.isActive()){
-            pagination.setPayload(payload);
-            pagination.updateItems(filterPayload(item));
-            // page_nav.computeTotalPages();
-            pagination.initial_sort(true);
-            // page = (page_nav.current_page <= page_nav.last_page) ? page_nav.current_page : page_nav.last_page;
-            // page_nav.sliceItems(page)
-            return;
-        }
-        pagination.setup(filterPayload(item), payload);
-        pagination.sliceItems(1);
+    if (pagination.isHandled(item)) {
         return;
-    } else {
-        // FIXME needs improvement
-        // We recreate the items and remove ourselves to leave the default logic do its thing
-        if (pagination){
-            console.log(`location refresh, page obj exist...`);
-            if (pagination.isActive()){
-                console.log(`location refresh, page obj active, slicing to 1`);
-                // page_nav.items = values(item.content);
-                pagination.updateItems(filterPayload(item));
-                // page_nav.computeTotalPages();
-                pagination.sliceItems(1);
-            }
-            // pagination.inst.buttons.forEach(e => e.remove());
-            // delete pagination.inst.buttons;
-            // pagination.inst = undefined;
-            pagination.clear();
-        }
     }
 
     const add = [];
@@ -358,7 +299,6 @@ const init = () => {
 
     event.sub('location.changed', onLocationChanged);
     event.sub('location.refreshed', onLocationRefreshed);
-    event.sub('pagination.pref.changed', onPaginationUpdated)
     event.sub('resize', onResize);
     onResize();
 };
