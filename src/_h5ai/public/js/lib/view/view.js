@@ -1,4 +1,4 @@
-const {each, map, values, includes, intersection, dom} = require('../util');
+const {each, map, includes, intersection, dom} = require('../util');
 const event = require('../core/event');
 const format = require('../core/format');
 const location = require('../core/location');
@@ -233,7 +233,6 @@ const onLocationChanged = item => {
     const items = filterPayload(item);
 
     setHint('empty');
-
     setItems(items);
 };
 
@@ -326,6 +325,5 @@ module.exports = {
     setSize
 };
 
-// We need to load pagination first, then export our methods here
-// TODO improve explanation
+// For code reuse purposes
 pagination.setView(module.exports);

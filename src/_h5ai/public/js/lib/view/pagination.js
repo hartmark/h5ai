@@ -224,13 +224,13 @@ const updatePageStatus = (div) => {
 const pageInputForm = () => {
     let input_field = document.createElement('input');
     input_field.type = 'text';
-    input_field.classList.add('page_input_text');
-    input_field.placeholder = 'page';
+    input_field.classList.add('l10n_ph-pagInputTxt');
+    // input_field.placeholder = 'page';
 
     let input_btn = document.createElement('input');
     input_btn.type = 'button';
-    input_btn.classList.add('page_input_button');
-    input_btn.value = 'GO';
+    input_btn.classList.add('l10n_val-pagInputBtn');
+    // input_btn.value = 'GO';
     input_btn.addEventListener('click', () => {
         if (input_field.value !== '' && input_field.value !== current_page) {
             sliceItems(input_field.value);
@@ -379,35 +379,22 @@ const paginationButton = (cls) => {
 	return button;
 };
 
-
-const destroyNavBar = (el) => {
-    // page_nav.buttons.forEach(el => {
-    //     // el.removeEventListener()
-    //     // delete el;
-    // });
-    el.innerHTML = "";
-    // each(el.childNodes, e => {
-    //     if (e !== undefined) e.remove();
-    // });
-};
-
 // Return an array of selectable options for the select list
 const addOptions = (cached_pref) => {
     let options = [];
     if (cached_pref === undefined){
         cached_pref = defaultSize;
     }
-    let has_set = false;
-    // TODO translations needed here
+    let set_default = false;
     for (let size of sortedSizes){
         let element;
-        let label = size === 0? 'ALL' :`${size} per page`;
-        if (size === cached_pref && !has_set) {
-            element = `<option selected value="${size}">${label}</option>`;
-            has_set = true;
+        if (size === cached_pref && !set_default) {
+            element = dom(`<option selected value="${size}"></option>`);
+            set_default = true;
         } else {
-            element = `<option value="${size}">${label}</option>`;
+            element = dom(`<option value="${size}"></option>`);
         }
+        element.addCls((size === 0) ? 'l10n-displayAll' : 'l10n_rp-perPage');
         options.push(element);
     }
     return options;
@@ -422,14 +409,14 @@ function onSelect() {
 }
 
 const onLocationChanged = item => {
-    // Workaround to append this in the sidebar at last position since
-    // the view module includes us before the other extensions
+    // Workaround to append this to the sidebar at the last position
+    // since the view module includes us before the other extensions
     if (document.querySelectorAll('#pag_select').length === 0){
-        addSelector();
+        initPagSelector();
     }
 }
 
-const addSelector = () => {
+const initPagSelector = () => {
     if (settings.paginationItems.length > 0) {
         dom(selectorTpl).appTo('#sidebar');
 
@@ -438,8 +425,8 @@ const addSelector = () => {
 
         let cached_pref = getCachedPref();
 
-        for (let item of addOptions(cached_pref)) {
-            dom(item).appTo('#pag_select');
+        for (let option of addOptions(cached_pref)) {
+            option.appTo('#pag_select');
         }
     }
 };
