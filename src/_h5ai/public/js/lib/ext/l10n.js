@@ -26,6 +26,7 @@ const defaultTranslations = {
     folders: 'folders',
     grid: 'grid',
     icons: 'icons',
+    info: 'Informations',
     language: 'Language',
     lastModified: 'Last modified',
     name: 'Name',
