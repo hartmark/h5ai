@@ -57,41 +57,38 @@ const getPref = () => {
 };
 
 console.log(`Required Pagination module...`);
-let pag_view;
-let rows_per_page = getPref();
-let pag_payload;
-let pag_items;
-// this.items = items;
-// this.setItems(items);
-let current_page = 1;
-let current_items;
-// this.popParentFolder();
-// this.computeTotalPages();
-let buttons = [];
-let $pagination_els;
-// this.setupNavigation(items, this.$pagination_els);
 let active = false;
-// this.sortfn = require('../ext/sort').getSortPref;
-// this.initial_sort();
+let buttons = [];
+let current_page = 1;
+let pag_items;
+let pag_payload;
+let pag_view;
 let page_count = 0;
 let parentFolder;
+let rows_per_page = getPref();
 
 const setup = (items) => {
-    console.log(`Pagination setup()`);
-    // rows_per_page = getPref();
-    // pag_payload = item;
-    // this.items = items;
+    console.log(`setup(items.length=${items.length})`);
     updateItems(items);
     current_page = 1;
-    current_items;
-    // this.popParentFolder();
-    // this.computeTotalPages();
     buttons = [];
-    $pagination_els = base.$content.find('.nav_buttons');
-    setupNavigation(items, $pagination_els);
+    let $pagination_els = base.$content.find('.nav_buttons');
+    setupNavigation($pagination_els);
     active = true;
     sortfn = require('../ext/sort').getSortPref;
-    initial_sort();
+    initialSort();
+}
+
+const updateItems = (items) => {
+    if (!items){
+        // send back "cached" items
+        console.log(`updateItems(${items})`);
+        items = pag_items;
+        return;
+    }
+    pag_items = items;
+    popParentFolder(pag_items);
+    computeTotalPages();
 }
 
 const clear = () => {
@@ -104,35 +101,15 @@ const clear = () => {
     active = false;
 }
 
-const first_page = () => { return 1; }
-const next_page = () => { return (current_page + 1); }
-const prev_page = () => { return (current_page - 1); }
-const last_page = () => { return page_count; }
-
-const updateItems = (items) => {
-    if (!items){
-        items = pag_items;
-        return;
-    }
-    pag_items = items;
-    popParentFolder(pag_items);
-    computeTotalPages();
-}
-
 const isActive = () => {
     // FIXME need more checks?
     return active;
 }
 
-const popParentFolder = (items) => {
-    if (items.length > 0 && !settings.hideParentFolder){
-        parentFolder = items.shift();
-        console.log(`popParentFolder: parentFolder = ${parentFolder.label}`);
-        return;
-    }
-    parentFolder = undefined;
-    console.log(`popParentFolder: parentFolder ${parentFolder}`);
-}
+const first_page = () => { return 1; }
+const next_page = () => { return (current_page + 1); }
+const prev_page = () => { return (current_page - 1); }
+const last_page = () => { return page_count; }
 
 //TODO put this in a setter for this.items to compute automatically when it's modified
 const computeTotalPages = () => {
@@ -146,6 +123,15 @@ const computeTotalPages = () => {
     return page_count;
 }
 
+const popParentFolder = (items) => {
+    if (items.length > 0 && !settings.hideParentFolder){
+        parentFolder = items.shift();
+        console.log(`popParentFolder: parentFolder = ${parentFolder.label}`);
+        return;
+    }
+    parentFolder = undefined;
+    console.log(`popParentFolder: parentFolder ${parentFolder}`);
+}
 
 const pushParentFolder = (items) => {
     if (parentFolder && items[0] !== parentFolder) {
@@ -153,15 +139,68 @@ const pushParentFolder = (items) => {
     }
 }
 
-const set_current_page = (page) => {
-    const parsed = parseInt(page, 10);
-    if (!isNaN(parsed)) {
-        current_page = parsed;
+// FIXME take into account the parent dir which counts towards items length
+// page: int, update: bool
+const setCurrentPage = (page, update = true) => {
+    if (isNaN(page)) {
+        throw(`Page ${page} is NaN!`);
     }
-    return parsed;
-};
+    current_page = page;
+    // console.log(`setCurrentPage: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
 
-const setupNavigation = (items, wrapper) => {
+    let paginatedItems = computeSlice(
+        pag_items, current_page, rows_per_page);
+
+    pushParentFolder(paginatedItems);
+
+    if (update) {
+        updateButtons();
+        if (last_page() <= 1) {
+            base.$content.find('.nav_buttons').addCls('hidden');
+            active = false;
+        } else {
+            base.$content.find('.nav_buttons').rmCls('hidden');
+            active = true;
+        }
+        console.log(`setCurrentPage(${page}) pagination ${active ? 'active' : 'inactive'}`);
+        pag_view.doSetItems(paginatedItems);
+    }
+    // this.current_items = paginatedItems;
+    // return paginatedItems;
+}
+
+const computeSlice = (items, page, rows_per_page) => {
+    // FIXME this returns either a ref to items, or a shallow copy (the slice)
+    if (!rows_per_page){
+        return items;
+    }
+    page--;
+    let start = rows_per_page * page;
+    let end = start + rows_per_page;
+    return items.slice(start, end);
+}
+
+const getNewCurrentPage = () => {
+    // Recompute the current page
+    page = (current_page <= last_page()) ? current_page : last_page();
+    console.log(`getNewCurrentPage(): ${page}`);
+    return page;
+}
+
+const sort = (fn) => {
+    pag_items = values(pag_payload.content).sort(fn);
+}
+
+const initialSort = (update = false) => {
+    sort(sortfn());
+    setCurrentPage(getNewCurrentPage(), update);
+}
+
+/*
+    Navigation
+*/
+
+const setupNavigation = (wrapper) => {
     each(wrapper, key => {
         key.innerHTML = "";
     });
@@ -183,7 +222,7 @@ const setupNavigation = (items, wrapper) => {
         // Manual page number selection
         div = document.createElement('div');
         div.classList.add('page_input');
-        let {page_input, go_btn} = pageInputForm(items);
+        let {page_input, go_btn} = pageInputForm();
         div.appendChild(page_input);
         div.appendChild(go_btn);
         key.appendChild(div);
@@ -191,6 +230,36 @@ const setupNavigation = (items, wrapper) => {
         buttons.push(go_btn);
     });
 }
+
+const paginationButton = (cls) => {
+	let button = document.createElement('button');
+    button.innerText = cls[1];
+    button.classList.add('nav_button');
+
+    button.id = cls[0];
+
+    switch (cls[0]) {
+        case 'btn_prev':
+            button.req_page = prev_page;
+            button.disabled = true;
+            break;
+        case 'btn_next':
+            button.req_page = next_page;
+            button.disabled = false;
+            break;
+        case 'btn_last':
+            button.req_page = last_page;
+            button.disabled = false;
+            break;
+        default: // 'btn_first'
+            button.req_page = first_page;
+            button.disabled = true;
+	}
+	button.addEventListener('click', function () {
+		setCurrentPage(this.req_page());
+	});
+	return button;
+};
 
 const updateButtons = () => {
     let prev_buttons =  document.querySelectorAll('#btn_first, #btn_prev');
@@ -233,7 +302,10 @@ const pageInputForm = () => {
     // input_btn.value = 'GO';
     input_btn.addEventListener('click', () => {
         if (input_field.value !== '' && input_field.value !== current_page) {
-            sliceItems(input_field.value);
+            let parsed = parseInt(input_field.value, 10);
+            if (!isNaN(parsed)) {
+                setCurrentPage(parsed);
+            }
         }
         input_field.value = "";
         input_field.focus();
@@ -243,7 +315,10 @@ const pageInputForm = () => {
         if (e.key === 'Enter' && input_field.value && /[^\s]/.test(input_field.value)) {
             if (input_field.value !== current_page) {
                 e.preventDefault();
-                sliceItems(input_field.value);
+                let parsed = parseInt(input_field.value, 10);
+                if (!isNaN(parsed)) {
+                    setCurrentPage(parsed);
+                }
             }
             input_field.value = "";
             input_field.focus();
@@ -257,73 +332,6 @@ const pageInputForm = () => {
 
     return {page_input: input_field, go_btn: input_btn};
 }
-
-const refreshItems = (payload) => {
-    this.pag_payload = payload;
-    this.pag_items = view.filterPayload(pag_payload);
-    if (isActive()){
-        computeTotalPages();
-
-    }
-}
-
-const getNewCurrentPage = () => {
-    page = (current_page <= last_page()) ? current_page : last_page();
-    console.log(`getNewCurrentPage: ${page}`);
-    return page;
-}
-
-// FIXME take into account the parent dir which counts towards items length
-const sliceItems = (page, update = true) => {
-    page = set_current_page(page); // FIXME can be improved
-    if (isNaN(page)) {
-        console.log(`Page ${page} is NaN!`);
-        return;
-    }
-    // console.log(`sliceItems: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
-
-    let paginatedItems = computeSlice(
-        pag_items, current_page, rows_per_page);
-    pushParentFolder(paginatedItems);
-
-    if (update) {
-        updateButtons();
-        if (last_page() <= 1) {
-            base.$content.find('.nav_buttons').addCls('hidden');
-            active = false;
-        } else {
-            base.$content.find('.nav_buttons').rmCls('hidden');
-            active = true;
-        }
-        console.log(`SliceItems(${page}) pagination ${active ? 'active' : 'inactive'}`);
-        pag_view.doSetItems(paginatedItems);
-    }
-    // this.current_items = paginatedItems;
-    // return paginatedItems;
-}
-
-const computeSlice = (items, page, rows_per_page) => {
-    // FIXME this returns either a ref to items, or a shallow copy (the slice)
-    if (!rows_per_page){
-        return items;
-    }
-    page--;
-    let start = rows_per_page * page;
-    let end = start + rows_per_page;
-    return items.slice(start, end);
-}
-
-const sort = (fn) => {
-    pag_items = values(pag_payload.content).sort(fn);
-    // event.pub('pagination.refreshed', this.pag_payload, [], []);
-}
-
-const initial_sort = (update = false) => {
-    sort(sortfn());
-    page = getNewCurrentPage();
-    sliceItems(page, update);
-}
-
 
 // Restricts input for the given textbox to the given inputFilter function.
 // In the future we could use beforeinput instead.
@@ -349,35 +357,30 @@ function setInputFilter(textbox, inputFilter) {
     });
 }
 
-const paginationButton = (cls) => {
-	let button = document.createElement('button');
-    button.innerText = cls[1];
-    button.classList.add('nav_button');
+/* 
+    Sidebar options 
+*/
 
-    button.id = cls[0];
+const initPagSelector = () => {
+    if (settings.paginationItems.length > 0) {
+        dom(selectorTpl).appTo('#sidebar');
 
-    switch (cls[0]) {
-        case 'btn_prev':
-            button.req_page = prev_page;
-            button.disabled = true;
-            break;
-        case 'btn_next':
-            button.req_page = next_page;
-            button.disabled = false;
-            break;
-        case 'btn_last':
-            button.req_page = last_page;
-            button.disabled = false;
-            break;
-        default: // 'btn_first'
-            button.req_page = first_page;
-            button.disabled = true;
-	}
-	button.addEventListener('click', function () {
-		sliceItems(this.req_page());
-	});
-	return button;
+        document.querySelector('#pag_select')
+            .addEventListener('change', onSelect);
+
+        let cached_pref = getCachedPref();
+
+        for (let option of addOptions(cached_pref)) {
+            option.appTo('#pag_select');
+        }
+    }
 };
+
+function onSelect() {
+    sizePref = parseInt(this.value, 10);
+    setPref(sizePref);
+    onPagPrefUpdated(sizePref);
+}
 
 // Return an array of selectable options for the select list
 const addOptions = (cached_pref) => {
@@ -400,14 +403,6 @@ const addOptions = (cached_pref) => {
     return options;
 }
 
-
-function onSelect() {
-    console.log(`selected ${this.value}`);
-    sizePref = parseInt(this.value, 10);
-    setPref(sizePref);
-    onPagPrefUpdated(sizePref);
-}
-
 const onLocationChanged = item => {
     // Workaround to append this to the sidebar at the last position
     // since the view module includes us before the other extensions
@@ -415,21 +410,6 @@ const onLocationChanged = item => {
         initPagSelector();
     }
 }
-
-const initPagSelector = () => {
-    if (settings.paginationItems.length > 0) {
-        dom(selectorTpl).appTo('#sidebar');
-
-        document.querySelector('#pag_select')
-            .addEventListener('change', onSelect);
-
-        let cached_pref = getCachedPref();
-
-        for (let option of addOptions(cached_pref)) {
-            option.appTo('#pag_select');
-        }
-    }
-};
 
 const setPayload = (payload) => {
     pag_payload = payload;
@@ -457,16 +437,23 @@ const onPagPrefUpdated = (pref) => {
         // setup(displayItems.slice(0));
         setup(); // reuse cached items
         setNumRows(pref);
-        sliceItems(1);
+        setCurrentPage(1);
         return;
     }
     setNumRows(pref);
-    page = getNewCurrentPage();
-    // console.log(`Result page ${page}, because ${page_nav.current_page}/ ${page_nav.last_page}`);
-    sliceItems(page);
+    setCurrentPage(getNewCurrentPage());
 }
 
-const isHandled = (item) => {
+const isSortHandled = (fn) => {
+    if (!isActive()) {
+        return false;
+    }
+    sort(fn);
+    setCurrentPage(getNewCurrentPage());
+    return true;
+}
+
+const isRefreshHandled = (item) => {
     setPayload(item);
     // Block if pagination is active
     console.log(`Refresh->items.len=${values(item.content).length}, pref: ${getCachedPref()}`);
@@ -474,25 +461,20 @@ const isHandled = (item) => {
         if (isActive()){
             updateItems(pag_view.filterPayload(item));
             // page_nav.computeTotalPages();
-            initial_sort(true);
+            initialSort(true);
             return true;
         }
         setup(pag_view.filterPayload(item));
-        sliceItems(1);
+        setCurrentPage(1);
         return true;
     }
-    // we don't need pagination for now...
-    // We recreate the items and remove ourselves to leave the default logic
-    // do its thing
+    // No need for pagination, recreate the items, hide, pass to default logic
     if (isActive()){
         console.log(`WARN: location refresh, pagination Active but not needed anymore...`);
         // page_nav.items = values(item.content);
         updateItems(pag_view.filterPayload(item)); //BUG?
         // page_nav.computeTotalPages();
-        sliceItems(1);
-        // inst.buttons.forEach(e => e.remove());
-        // delete inst.buttons;
-        // inst = undefined;
+        setCurrentPage(1);
         clear();
         return true;
     }
@@ -500,9 +482,7 @@ const isHandled = (item) => {
     return false;
 }
 
-
 const init = () => {
-    console.log("init from pagination");
     setPref();
     getPref();
     event.sub('location.changed', onLocationChanged);
@@ -512,22 +492,14 @@ init();
 
 module.exports = {
 	$el: $pagination,
-    getPref,
-    getCachedPref,
-    pag_payload,
-    updateItems,
-    initial_sort,
-    setup,
-    sliceItems,
-    isActive,
     clear,
-    computeTotalPages,
-    last_page,
-    current_page,
-    setNumRows,
-    setPayload,
-    sort,
-    setView,
+    getCachedPref,
     getNewCurrentPage,
-    isHandled,
+    isActive,
+    isRefreshHandled,
+    isSortHandled,
+    setPayload,
+    setup,
+    setView,
+    setCurrentPage,
 }

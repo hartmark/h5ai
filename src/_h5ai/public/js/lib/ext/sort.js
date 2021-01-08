@@ -3,7 +3,6 @@ const event = require('../core/event');
 const resource = require('../core/resource');
 const allsettings = require('../core/settings');
 const store = require('../core/store');
-const view = require('../view/view');
 const pagination = require('../view/pagination');
 
 const settings = Object.assign({
@@ -60,22 +59,17 @@ const sortItems = (column, reverse) => {
     $headers.rmCls('ascending').rmCls('descending');
     $header.addCls(reverse ? 'descending' : 'ascending');
 
-    if (pagination.isActive()){
-        pagination.sort(fn);
-        page = pagination.getNewCurrentPage();
-        pagination.sliceItems(page);
+    if (pagination.isSortHandled(fn)) {
         return;
     }
     dom(toArray(dom('#items .item:not(.folder-parent)')).sort(fn)).appTo('#items');
 };
 
 const onContentChanged = () => {
-    // if (view.getPag() && view.getPag().isActive()){
     if (pagination.isActive()){
-        console.log("sort.onContentChanged() blocked!");
         return;
     }
-    console.log("sort.onContentChanged() passed!");
+    //console.log("sort.onContentChanged() passed!");
     const order = store.get(storekey);
     const column = order && order.column || settings.column;
     const reverse = order && order.reverse || settings.reverse;
