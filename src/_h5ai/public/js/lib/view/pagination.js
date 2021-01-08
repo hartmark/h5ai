@@ -27,34 +27,6 @@ const selectorTpl =
         </div>`;
 const $pagination = dom(paginationTpl);
 const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['btn_last', '>>']];
-let sizePref;
-
-const setPref = (size) => {
-	const stored = store.get(storekey);
-	size = (size !== undefined) ? size : stored ? stored : defaultSize;
-    size = includes(settings.paginationItems, size) ? size :
-                defaultSize; //FIXME probably shouldn't store anything instead?
-    console.log(`setPref: storing pagination size ${size}`);
-	store.put(storekey, size);
-}
-
-const getPref = () => {
-    let pref;
-    try {
-        pref = store.get(storekey);
-    } catch (error) {
-        console.log("Exception getting size pref:", error);
-        pref = undefined;
-    }
-    console.log(`After getting pref: ${pref}`);
-    if (pref === undefined) {
-        sizePref = defaultSize;
-    } else {
-        sizePref = parseInt(pref, 10);
-        setPref(sizePref);
-    }
-    return sizePref;
-};
 
 console.log(`Required Pagination module...`);
 let active = false;
@@ -65,10 +37,10 @@ let pag_payload;
 let pag_view;
 let page_count = 0;
 let parentFolder;
-let rows_per_page = getPref();
+let rowsPref;
 
 const setup = (items) => {
-    console.log(`setup(items.length=${items.length})`);
+    console.log(`setup(items.length=${items ? items.length : items})`);
     updateItems(items);
     current_page = 1;
     buttons = [];
@@ -113,12 +85,12 @@ const last_page = () => { return page_count; }
 
 //TODO put this in a setter for this.items to compute automatically when it's modified
 const computeTotalPages = () => {
-    console.log(`computeTotalPages() rows_per_page ${rows_per_page}`);
-    if (rows_per_page == 0){
+    console.log(`computeTotalPages() rowsPref ${rowsPref}`);
+    if (rowsPref == 0){  // ALL
         page_count = 1;
         return 1;
     }
-    page_count = Math.ceil(pag_items.length / rows_per_page);
+    page_count = Math.ceil(pag_items.length / rowsPref);
     console.log(`Computed page count: ${page_count}`);
     return page_count;
 }
@@ -140,16 +112,15 @@ const pushParentFolder = (items) => {
 }
 
 // FIXME take into account the parent dir which counts towards items length
-// page: int, update: bool
 const setCurrentPage = (page, update = true) => {
     if (isNaN(page)) {
-        throw(`Page ${page} is NaN!`);
+        throw(`Page ${page} is not a number!`);
     }
     current_page = page;
-    // console.log(`setCurrentPage: at page ${page}, current_page ${this.current_page}, rows: ${this.rows_per_page}`);
+    // console.log(`setCurrentPage: at page ${page}, current_page ${this.current_page}, rows: ${this.rowsPref}`);
 
     let paginatedItems = computeSlice(
-        pag_items, current_page, rows_per_page);
+        pag_items, current_page, rowsPref);
 
     pushParentFolder(paginatedItems);
 
@@ -316,7 +287,7 @@ const pageInputForm = () => {
             if (input_field.value !== current_page) {
                 e.preventDefault();
                 let parsed = parseInt(input_field.value, 10);
-                if (!isNaN(parsed)) {
+                if (!isNaN(parsed) && parsed !== current_page) {
                     setCurrentPage(parsed);
                 }
             }
@@ -357,9 +328,6 @@ function setInputFilter(textbox, inputFilter) {
     });
 }
 
-/* 
-    Sidebar options 
-*/
 
 const initPagSelector = () => {
     if (settings.paginationItems.length > 0) {
@@ -377,9 +345,8 @@ const initPagSelector = () => {
 };
 
 function onSelect() {
-    sizePref = parseInt(this.value, 10);
-    setPref(sizePref);
-    onPagPrefUpdated(sizePref);
+    setPref(parseInt(this.value, 10));
+    onPagPrefUpdated();
 }
 
 // Return an array of selectable options for the select list
@@ -416,9 +383,9 @@ const setPayload = (payload) => {
 }
 
 const getCachedPref = () => {
-    if (sizePref === undefined)
+    if (rowsPref === undefined)
         return defaultSize;
-    return sizePref;
+    return rowsPref;
 };
 
 // The module won't work if a view is not set first!
@@ -426,22 +393,17 @@ const setView = (view) => {
     pag_view = view;
 }
 
-const setNumRows = (num) => {
-    rows_per_page = num;
-    computeTotalPages();
-}
-
-const onPagPrefUpdated = (pref) => {
-    console.log(`Pagination updated, isActive? ${isActive()}`);
-    if (!isActive()) {
-        // setup(displayItems.slice(0));
-        setup(); // reuse cached items
-        setNumRows(pref);
-        setCurrentPage(1);
+const onPagPrefUpdated = () => {
+    console.log(`PagPref Updated while ${isActive() ? "active" : "not active"}.`);
+    if (isActive()) {
+        computeTotalPages();
+        setCurrentPage(getNewCurrentPage());
         return;
     }
-    setNumRows(pref);
-    setCurrentPage(getNewCurrentPage());
+    // setup(displayItems.slice(0));
+    setup(); // reuse cached items
+    computeTotalPages();
+    setCurrentPage(1);
 }
 
 const isSortHandled = (fn) => {
@@ -482,9 +444,19 @@ const isRefreshHandled = (item) => {
     return false;
 }
 
+const setPref = (size) => {
+	const stored = store.get(storekey);
+    size = (size !== undefined) ? size : stored ? stored : defaultSize;
+    //FIXME probably shouldn't store anything instead?
+    size = includes(settings.paginationItems, size) ? size : defaultSize;
+
+    console.log(`setPref() -> ${size} type is ${typeof(size)}`);
+    store.put(storekey, size);
+    rowsPref = size;
+}
+
 const init = () => {
     setPref();
-    getPref();
     event.sub('location.changed', onLocationChanged);
 };
 
