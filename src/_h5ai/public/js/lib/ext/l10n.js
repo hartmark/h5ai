@@ -70,6 +70,7 @@ const update = lang => {
         dom('.l10n_ph-' + key).attr('placeholder', value);
         replace(dom('.l10n_rp-' + key), value);
         dom('.l10n_val-' + key).val(value);
+        dom('.l10n_title-' + key).prop('title', value)
     });
     format.setDefaultDateFormat(currentLang.dateFormat);
 

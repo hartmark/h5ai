@@ -2,7 +2,7 @@
 // @height: 28px;
 // @lineHeight: @height;
 // @activeHeight: @height + 2;
-@inputWidth: 30px;
+@inputWidth: 35px;
 @inputHeight: 28px;
 @buttonMinWidth: 40px;
 @buttonHeight: 30px;
@@ -75,6 +75,9 @@
             &::placeholder {
                 color: @col-placeholder-grey;
                 opacity: 1; /* Firefox */
+            }
+            &:focus::placeholder {
+                color: transparent;
             }
         }
 

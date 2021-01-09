@@ -229,7 +229,7 @@ const onLocationChanged = item => {
         item = location.getItem();
     }
 
-    pagination.setPayload(item); // caching for reuse, make copy?
+    pagination.setPayload(item);
 
     const items = filterPayload(item);
 

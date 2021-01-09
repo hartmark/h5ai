@@ -28,7 +28,6 @@ const selectorTpl =
 const $pagination = dom(paginationTpl);
 const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['btn_last', '>>']];
 
-console.log(`Required Pagination module...`);
 let active = false;
 let buttons = [];
 let current_page = 1;
@@ -60,7 +59,7 @@ const updateItems = (items) => {
     }
     pag_items = items;
     popParentFolder(pag_items);
-    computeTotalPages();
+    totalPages();
 }
 
 const clear = () => {
@@ -83,12 +82,10 @@ const next_page = () => { return (current_page + 1); }
 const prev_page = () => { return (current_page - 1); }
 const last_page = () => { return page_count; }
 
-//TODO put this in a setter for this.items to compute automatically when it's modified
-const computeTotalPages = () => {
-    console.log(`computeTotalPages() rowsPref ${rowsPref}`);
+const totalPages = () => {
+    console.log(`totalPages() rowsPref ${rowsPref}`);
     if (rowsPref == 0){  // ALL
-        page_count = 1;
-        return 1;
+        return page_count = 1;
     }
     page_count = Math.ceil(pag_items.length / rowsPref);
     console.log(`Computed page count: ${page_count}`);
@@ -159,6 +156,7 @@ const getNewCurrentPage = () => {
 }
 
 const sort = (fn) => {
+    // Do not filterPayload, we don't need parent folder item
     pag_items = values(pag_payload.content).sort(fn);
 }
 
@@ -166,10 +164,6 @@ const initialSort = (update = false) => {
     sort(sortfn());
     setCurrentPage(getNewCurrentPage(), update);
 }
-
-/*
-    Navigation
-*/
 
 const setupNavigation = (wrapper) => {
     each(wrapper, key => {
@@ -233,8 +227,8 @@ const paginationButton = (cls) => {
 };
 
 const updateButtons = () => {
-    let prev_buttons =  document.querySelectorAll('#btn_first, #btn_prev');
-    let next_buttons =  document.querySelectorAll('#btn_next, #btn_last');
+    let prev_buttons =  dom('#btn_first, #btn_prev');
+    let next_buttons =  dom('#btn_next, #btn_last');
     if (current_page <= 1) {
         each(prev_buttons, button => button.disabled = true);
         each(next_buttons, button => button.disabled = false);
@@ -242,35 +236,35 @@ const updateButtons = () => {
         each(next_buttons, button => button.disabled = true);
         each(prev_buttons, button => button.disabled = false);
     } else {
-        let nav_buttons = document.querySelectorAll('#btn_first, #btn_prev, #btn_next, #btn_last');
+        let nav_buttons = dom('#btn_first, #btn_prev, #btn_next, #btn_last');
         each(nav_buttons, button => button.disabled = false);
     }
-    let page_pos = document.querySelectorAll('.page_pos');
-    each(page_pos, el => updatePageStatus(el));
+    let pag_pos = dom('.pag_pos');
+    each(pag_pos, el => updatePageStatus(el));
 }
 
 const updatePageStatus = (div) => {
-    _str = current_page.toString()
-        .concat('/', page_count.toString());
+    status = current_page.toString().concat('/', page_count.toString());
     if (!div) {
         div = document.createElement('div');
-        div.appendChild(document.createTextNode(_str));
-        div.classList.add('page_pos');
+        div.appendChild(document.createTextNode(status));
+        div.classList.add('pag_pos');
         return div;
     }
-    return div.innerText = _str;
+    return div.innerText = status;
 }
 
 const pageInputForm = () => {
     let input_field = document.createElement('input');
     input_field.type = 'text';
-    input_field.classList.add('l10n_ph-pagInputTxt');
-    // input_field.placeholder = 'page';
+    // Use title instead of placeholder due to some translations not fitting in
+    input_field.classList.add('l10n_title-pagInputTxt'); // input_field.title = 'page';
+    input_field.placeholder = '...';
 
     let input_btn = document.createElement('input');
     input_btn.type = 'button';
-    input_btn.classList.add('l10n_val-pagInputBtn');
-    // input_btn.value = 'GO';
+    input_btn.classList.add('l10n_val-pagInputBtn'); // input_btn.value = 'GO';
+
     input_btn.addEventListener('click', () => {
         if (input_field.value !== '' && input_field.value !== current_page) {
             let parsed = parseInt(input_field.value, 10);
@@ -312,22 +306,20 @@ function setInputFilter(textbox, inputFilter) {
         textbox.addEventListener(event, function(e) {
             if (this.value === '') {
                 this.oldValue = this.value;
-                // return;
             }
             if (inputFilter(this.value)) {
-            this.oldValue = this.value;
-            this.oldSelectionStart = this.selectionStart;
-            this.oldSelectionEnd = this.selectionEnd;
+                this.oldValue = this.value;
+                this.oldSelectionStart = this.selectionStart;
+                this.oldSelectionEnd = this.selectionEnd;
             } else if (this.hasOwnProperty("oldValue")) {
-            this.value = this.oldValue;
-            this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+                this.value = this.oldValue;
+                this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
             } else {
-            this.value = "";
+                this.value = "";
             }
         });
     });
 }
-
 
 const initPagSelector = () => {
     if (settings.paginationItems.length > 0) {
@@ -373,12 +365,13 @@ const addOptions = (cached_pref) => {
 const onLocationChanged = item => {
     // Workaround to append this to the sidebar at the last position
     // since the view module includes us before the other extensions
-    if (document.querySelectorAll('#pag_select').length === 0){
+    if (dom('#pag_select').length === 0){
         initPagSelector();
     }
 }
 
 const setPayload = (payload) => {
+    // FIXME not a copy, we probably should not alter it.
     pag_payload = payload;
 }
 
@@ -388,7 +381,7 @@ const getCachedPref = () => {
     return rowsPref;
 };
 
-// The module won't work if a view is not set first!
+// The module won't work if a view is not set first! We need to reuse some funcs
 const setView = (view) => {
     pag_view = view;
 }
@@ -396,13 +389,13 @@ const setView = (view) => {
 const onPagPrefUpdated = () => {
     console.log(`PagPref Updated while ${isActive() ? "active" : "not active"}.`);
     if (isActive()) {
-        computeTotalPages();
+        totalPages();
         setCurrentPage(getNewCurrentPage());
         return;
     }
     // setup(displayItems.slice(0));
     setup(); // reuse cached items
-    computeTotalPages();
+    totalPages();
     setCurrentPage(1);
 }
 
@@ -422,7 +415,7 @@ const isRefreshHandled = (item) => {
     if (values(item.content).length > getCachedPref()) {
         if (isActive()){
             updateItems(pag_view.filterPayload(item));
-            // page_nav.computeTotalPages();
+            // page_nav.totalPages();
             initialSort(true);
             return true;
         }
@@ -435,7 +428,7 @@ const isRefreshHandled = (item) => {
         console.log(`WARN: location refresh, pagination Active but not needed anymore...`);
         // page_nav.items = values(item.content);
         updateItems(pag_view.filterPayload(item)); //BUG?
-        // page_nav.computeTotalPages();
+        // page_nav.totalPages();
         setCurrentPage(1);
         clear();
         return true;
@@ -447,10 +440,7 @@ const isRefreshHandled = (item) => {
 const setPref = (size) => {
 	const stored = store.get(storekey);
     size = (size !== undefined) ? size : stored ? stored : defaultSize;
-    //FIXME probably shouldn't store anything instead?
     size = includes(settings.paginationItems, size) ? size : defaultSize;
-
-    console.log(`setPref() -> ${size} type is ${typeof(size)}`);
     store.put(storekey, size);
     rowsPref = size;
 }
