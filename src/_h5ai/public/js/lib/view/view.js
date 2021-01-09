@@ -184,11 +184,7 @@ const checkHint = () => {
 };
 
 const setItems = items => {
-    pagination.clear();
-    if (items.length > pagination.getCachedPref()) {
-        pagination.setup(items.slice(0)); // copy displayItems
-        pagination.setCurrentPage(1);
-    } else {
+    if (!pagination.canHandle(items)) {
         doSetItems(items);
     }
 };
@@ -253,8 +249,6 @@ const filterPayload = item => {
 }
 
 const onLocationRefreshed = (item, added, removed) => {
-    //console.log(`refresh items: ${item.length} added ${added} length ${added.length} removed ${removed} length ${removed.length}`);
-
     if (added.length === 0 && removed.length === 0){
         return;
     }

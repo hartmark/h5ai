@@ -46,7 +46,7 @@ const setup = (items) => {
     let $pagination_els = base.$content.find('.nav_buttons');
     setupNavigation($pagination_els);
     active = true;
-    sortfn = require('../ext/sort').getSortPref;
+    sortfn = require('../ext/sort').getSortFunc;
     initialSort();
 }
 
@@ -76,11 +76,6 @@ const isActive = () => {
     // FIXME need more checks?
     return active;
 }
-
-const first_page = () => { return 1; }
-const next_page = () => { return (current_page + 1); }
-const prev_page = () => { return (current_page - 1); }
-const last_page = () => { return page_count; }
 
 const totalPages = () => {
     console.log(`totalPages() rowsPref ${rowsPref}`);
@@ -116,14 +111,14 @@ const setCurrentPage = (page, update = true) => {
     current_page = page;
     // console.log(`setCurrentPage: at page ${page}, current_page ${this.current_page}, rows: ${this.rowsPref}`);
 
-    let paginatedItems = computeSlice(
+    const paginatedItems = computeSlice(
         pag_items, current_page, rowsPref);
 
     pushParentFolder(paginatedItems);
 
     if (update) {
         updateButtons();
-        if (last_page() <= 1) {
+        if (page_count <= 1) {
             base.$content.find('.nav_buttons').addCls('hidden');
             active = false;
         } else {
@@ -143,14 +138,14 @@ const computeSlice = (items, page, rows_per_page) => {
         return items;
     }
     page--;
-    let start = rows_per_page * page;
-    let end = start + rows_per_page;
+    const start = rows_per_page * page;
+    const end = start + rows_per_page;
     return items.slice(start, end);
 }
 
 const getNewCurrentPage = () => {
     // Recompute the current page
-    page = (current_page <= last_page()) ? current_page : last_page();
+    const page = (current_page <= page_count) ? current_page : page_count;
     console.log(`getNewCurrentPage(): ${page}`);
     return page;
 }
@@ -172,7 +167,7 @@ const setupNavigation = (wrapper) => {
 
     for (let i = 0; i < btn_cls.length; i++) {
         each(wrapper, key => {
-            let btn = paginationButton(btn_cls[i], this);
+            const btn = paginationButton(btn_cls[i], this);
             key.appendChild(btn);
             buttons.push(btn);
         });
@@ -187,17 +182,17 @@ const setupNavigation = (wrapper) => {
         // Manual page number selection
         div = document.createElement('div');
         div.classList.add('page_input');
-        let {page_input, go_btn} = pageInputForm();
-        div.appendChild(page_input);
-        div.appendChild(go_btn);
+        let {input_field, input_btn} = pageInputForm();
+        div.appendChild(input_field);
+        div.appendChild(input_btn);
         key.appendChild(div);
-        buttons.push(page_input);
-        buttons.push(go_btn);
+        buttons.push(input_field);
+        buttons.push(input_btn);
     });
 }
 
 const paginationButton = (cls) => {
-	let button = document.createElement('button');
+	const button = document.createElement('button');
     button.innerText = cls[1];
     button.classList.add('nav_button');
 
@@ -205,30 +200,30 @@ const paginationButton = (cls) => {
 
     switch (cls[0]) {
         case 'btn_prev':
-            button.req_page = prev_page;
+            button.req_page = () => current_page - 1;
             button.disabled = true;
             break;
         case 'btn_next':
-            button.req_page = next_page;
+            button.req_page = () => current_page + 1;
             button.disabled = false;
             break;
         case 'btn_last':
-            button.req_page = last_page;
+            button.req_page = () => page_count;
             button.disabled = false;
             break;
         default: // 'btn_first'
-            button.req_page = first_page;
+            button.req_page = () => 1;
             button.disabled = true;
 	}
-	button.addEventListener('click', function () {
+	button.addEventListener('click', function() {
 		setCurrentPage(this.req_page());
 	});
 	return button;
 };
 
 const updateButtons = () => {
-    let prev_buttons =  dom('#btn_first, #btn_prev');
-    let next_buttons =  dom('#btn_next, #btn_last');
+    const prev_buttons =  dom('#btn_first, #btn_prev');
+    const next_buttons =  dom('#btn_next, #btn_last');
     if (current_page <= 1) {
         each(prev_buttons, button => button.disabled = true);
         each(next_buttons, button => button.disabled = false);
@@ -236,17 +231,17 @@ const updateButtons = () => {
         each(next_buttons, button => button.disabled = true);
         each(prev_buttons, button => button.disabled = false);
     } else {
-        let nav_buttons = dom('#btn_first, #btn_prev, #btn_next, #btn_last');
+        const nav_buttons = dom('#btn_first, #btn_prev, #btn_next, #btn_last');
         each(nav_buttons, button => button.disabled = false);
     }
-    let pag_pos = dom('.pag_pos');
+    const pag_pos = dom('.pag_pos');
     each(pag_pos, el => updatePageStatus(el));
 }
 
 const updatePageStatus = (div) => {
-    status = current_page.toString().concat('/', page_count.toString());
+    const status = current_page.toString().concat('/', page_count.toString());
     if (!div) {
-        div = document.createElement('div');
+        const div = document.createElement('div');
         div.appendChild(document.createTextNode(status));
         div.classList.add('pag_pos');
         return div;
@@ -255,13 +250,13 @@ const updatePageStatus = (div) => {
 }
 
 const pageInputForm = () => {
-    let input_field = document.createElement('input');
+    const input_field = document.createElement('input');
     input_field.type = 'text';
     // Use title instead of placeholder due to some translations not fitting in
     input_field.classList.add('l10n_title-pagInputTxt'); // input_field.title = 'page';
     input_field.placeholder = '...';
 
-    let input_btn = document.createElement('input');
+    const input_btn = document.createElement('input');
     input_btn.type = 'button';
     input_btn.classList.add('l10n_val-pagInputBtn'); // input_btn.value = 'GO';
 
@@ -295,7 +290,7 @@ const pageInputForm = () => {
         return /^[^0\s][\d]*$/.test(value) && value <= page_count;
     });
 
-    return {page_input: input_field, go_btn: input_btn};
+    return {input_field, input_btn};
 }
 
 // Restricts input for the given textbox to the given inputFilter function.
@@ -328,7 +323,7 @@ const initPagSelector = () => {
         document.querySelector('#pag_select')
             .addEventListener('change', onSelect);
 
-        let cached_pref = getCachedPref();
+        const cached_pref = getCachedPref();
 
         for (let option of addOptions(cached_pref)) {
             option.appTo('#pag_select');
@@ -343,7 +338,7 @@ function onSelect() {
 
 // Return an array of selectable options for the select list
 const addOptions = (cached_pref) => {
-    let options = [];
+    const options = [];
     if (cached_pref === undefined){
         cached_pref = defaultSize;
     }
@@ -397,6 +392,16 @@ const onPagPrefUpdated = () => {
     setup(); // reuse cached items
     totalPages();
     setCurrentPage(1);
+}
+
+const canHandle = (items) => {
+    clear();
+    if (items.length > getCachedPref()) {
+        setup(items.slice(0)); // copy displayItems
+        setCurrentPage(1);
+        return true;
+    }
+    return false;
 }
 
 const isSortHandled = (fn) => {
@@ -454,6 +459,7 @@ init();
 
 module.exports = {
 	$el: $pagination,
+    canHandle,
     clear,
     getCachedPref,
     getNewCurrentPage,

@@ -69,18 +69,20 @@ const onContentChanged = () => {
     if (pagination.isActive()){
         return;
     }
-    //console.log("sort.onContentChanged() passed!");
-    const order = store.get(storekey);
-    const column = order && order.column || settings.column;
-    const reverse = order && order.reverse || settings.reverse;
 
+    let {column, reverse} = getSortOrder();
     sortItems(column, reverse);
 };
 
-const getSortPref = () => {
+const getSortOrder =() => {
     const order = store.get(storekey);
     const column = order && order.column || settings.column;
     const reverse = order && order.reverse || settings.reverse;
+    return {column, reverse};
+}
+
+const getSortFunc = () => {
+    let {column, reverse} = getSortOrder();
     return cmpFn(columnProps[column], reverse, settings.ignorecase, settings.natural);
 }
 
@@ -111,5 +113,5 @@ const init = () => {
 init();
 
 module.exports = {
-    getSortPref
+    getSortFunc
 }
