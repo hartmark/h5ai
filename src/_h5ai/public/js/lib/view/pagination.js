@@ -26,7 +26,7 @@ const selectorTpl =
             </form>
         </div>`;
 const $pagination = dom(paginationTpl);
-const btn_cls = [['btn_first', '<<'], ['btn_prev', '<'], ['btn_next', '>'], ['btn_last', '>>']];
+const btn_cls = {'btn_first': '<<', 'btn_prev': '<', 'btn_next': '>', 'btn_last': '>>'};
 
 let active = false;
 let buttons = [];
@@ -103,7 +103,6 @@ const pushParentFolder = (items) => {
     }
 }
 
-// FIXME take into account the parent dir which counts towards items length
 const setCurrentPage = (page, update = true) => {
     if (isNaN(page)) {
         throw(`Page ${page} is not a number!`);
@@ -160,20 +159,20 @@ const initialSort = (update = false) => {
     setCurrentPage(getNewCurrentPage(), update);
 }
 
-const setupNavigation = (wrapper) => {
-    each(wrapper, key => {
+const setupNavigation = (container) => {
+    each(container, key => {
         key.innerHTML = "";
     });
 
-    for (let i = 0; i < btn_cls.length; i++) {
-        each(wrapper, key => {
-            const btn = paginationButton(btn_cls[i], this);
-            key.appendChild(btn);
+    each(container, el => {
+        for (let key in btn_cls) {
+            const btn = paginationButton(key, btn_cls[key]);
+            el.appendChild(btn);
             buttons.push(btn);
-        });
-    }
+        }
+    });
 
-    each(wrapper, key => {
+    each(container, key => {
         // Page status numbers
         let div = updatePageStatus(null);
         key.insertBefore(div, key.childNodes[2]);
@@ -191,14 +190,14 @@ const setupNavigation = (wrapper) => {
     });
 }
 
-const paginationButton = (cls) => {
+const paginationButton = (classname, arrow) => {
 	const button = document.createElement('button');
-    button.innerText = cls[1];
+    button.innerText = arrow;
     button.classList.add('nav_button');
 
-    button.id = cls[0];
+    button.id = classname;
 
-    switch (cls[0]) {
+    switch (classname) {
         case 'btn_prev':
             button.req_page = () => current_page - 1;
             button.disabled = true;
