@@ -74,7 +74,7 @@ const onContentChanged = () => {
     sortItems(column, reverse);
 };
 
-const getSortOrder =() => {
+const getSortOrder = () => {
     const order = store.get(storekey);
     const column = order && order.column || settings.column;
     const reverse = order && order.reverse || settings.reverse;
