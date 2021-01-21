@@ -68,6 +68,9 @@ class Setup {
         $this->set('HAS_PHP_JPEG', $has_php_jpeg);
 
         $this->set('HAS_PHP_FILEINFO', extension_loaded('fileinfo'));
+
+        $this->set('HAS_PHP_ZIP', extension_loaded('zip'));
+        $this->set('HAS_PHP_RAR', extension_loaded('rar'));
     }
 
     private function add_app_metadata() {
@@ -135,7 +138,7 @@ class Setup {
                 $cmd = 'where';
             }
 
-            foreach (['avconv', 'avprobe', 'convert', 'du', 'ffmpeg', 'ffprobe', 'gm', 'tar', 'zip'] as $c) {
+            foreach (['avconv', 'avprobe', 'convert', 'du', 'ffmpeg', 'ffprobe', 'gm', 'tar', 'zip', 'unzip', 'unrar'] as $c) {
                 $cmds[$c] = ($cmd !== false) && (Util::exec_0($cmd . ' ' . $c) || Util::exec_0($cmd . ' ' . $c . '.exe'));
             }
 
@@ -162,6 +165,8 @@ class Setup {
                 'HAS_PHP_EXIF',
                 'HAS_PHP_JPEG',
                 'HAS_PHP_FILEINFO',
+                'HAS_PHP_ZIP',
+                'HAS_PHP_RAR',
 
                 'SERVER_NAME',
                 'SERVER_VERSION',
@@ -178,7 +183,8 @@ class Setup {
                 'HAS_CMD_FFMPEG',
                 'HAS_CMD_GM',
                 'HAS_CMD_TAR',
-                'HAS_CMD_ZIP'
+                'HAS_CMD_UNZIP',
+                'HAS_CMD_UNRAR'
             ]);
         }
 

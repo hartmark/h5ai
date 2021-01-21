@@ -251,10 +251,12 @@ class Context {
         $height = $this->options['thumbnails']['size'] ?? 240;
         $width = floor($height * (4 / 3));
 
+        $db = new CacheDB($this->setup);
+
         foreach ($requests as $req) {
             $path = $this->to_path($req['href']);
             if (!array_key_exists($path, $thumbs)) {
-                $thumbs[$path] = new Thumb($this, $path, $req['type']);
+                $thumbs[$path] = new Thumb($this, $path, $req['type'], $db);
             }
             else if ($thumbs[$path]->type === 'file') {
                 // File has already been mime tested and cannot have a thumbnail
@@ -264,6 +266,10 @@ class Context {
             $hrefs[] = $thumbs[$path]->thumb($width, $height);
         }
         return $hrefs;
+    }
+
+    public function write_log($msg){
+        Util::write_log($msg, $this->setup->get('PRIVATE_PATH'));
     }
 
     private function prefix_x_head_href($href) {

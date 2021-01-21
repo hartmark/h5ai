@@ -8,6 +8,7 @@ class Thumb {
     private static $CONVERT_CMDV = ['convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
     private static $GM_CONVERT_CMDV = ['gm', 'convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
     private static $THUMB_CACHE = 'thumbs';
+    private static $IMG_EXT = ['jpg', 'jpe', 'jpeg', 'jp2', 'jpx', 'tiff', 'webp', 'ico', 'png', 'bmp', 'gif'];
 
     private $context;
     private $setup;
@@ -15,10 +16,12 @@ class Thumb {
     private $thumbs_href;
     private $image;
     private $attempt;
+    private $db;
 
-    public function __construct($context, $source_path, $type) {
+    public function __construct($context, $source_path, $type, $db) {
         $this->context = $context;
         $this->setup = $context->get_setup();
+        $this->db = $db;
         $this->thumbs_path = $this->setup->get('CACHE_PUB_PATH') . '/' . self::$THUMB_CACHE;
         $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . self::$THUMB_CACHE;
         $this->source_path = $source_path;
@@ -53,10 +56,18 @@ class Thumb {
             if ($this->type === 'file') {
                 // This one was previously detected as able to generate thumbnail,
                 // if we leave 'file' as type, this would block the next requests
-                $this->type = 'done';
+                $this->type = '';
             }
             return $this->thumb_href;
         }
+
+        // We have a cached handled failure, skip it
+        $cached = $this->db->has_result($this->source_hash);
+        if ($cached) {
+            error_log("RETURN NULL for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
+            return null;
+        }
+
         if ($this->image !== null) {
             // Use cached capture data
             return $this->thumb_href($width, $height);
@@ -68,8 +79,7 @@ class Thumb {
         /* Hopefully, the first type is the right one, but in the off chance
            that it is not, we'll shift to test the subsequent ones. */
         foreach($types as $type) {
-            $capture = $this->capture($type);
-            if (!$capture) {
+            if (!$this->capture($type)) {
                 if ($this->type === 'file') {
                     break;  // We have tried as a file but failed
                 }
@@ -127,7 +137,7 @@ class Thumb {
                     return $this->capture('swf');
                 }
             }
-            $success = $this->do_capture_img();
+            $success = $this->do_capture_img($this->source_path);
             return $success ? $success : $this->capture('file');
         }
         else if ($type === 'mov') {
@@ -181,27 +191,122 @@ class Thumb {
                 return $this->capture('file');
             }
         }
+        else if (strpos($type, 'ar') !== false) {
+            try {
+                return $this->do_capture_archive($this->source_path, $type);
+            } catch (UnhandledArchive $e) {
+                error_log("Unhandled $this->source_path: ". $e->getMessage() . PHP_EOL);
+                $this->type = 'file';
+                // Cache failure result to avoid scanning again in the near future
+                $this->db->insert($this->source_hash, $e->getCode());
+                return false;
+            } catch (WrongType $e) {
+                error_log("WrongType for $this->source_path: ". $e->getMessage() . PHP_EOL);
+                return $this->capture('file');
+            } catch (Exception $e) { // Probably shouldn't cache this one.
+                $this->type = 'file';
+            }
+        }
         return false;
     }
 
-    public function do_capture_img() {
-        $image = new Image($this->source_path);
+    public function do_capture_archive($path, $type) {
+        $extracted = $this->extract_from_archive($type);
+        if (!$extracted) {
+            throw new UnhandledArchive("No file found in archive.", 1);
+        }
+        $success = $this->do_capture_img($extracted);
+        if (!$success){
+            throw new UnhandledArchive("Failed processing selected file from archive.", 2);
+        }
+        return $success;
+    }
 
-        $MBs = 2 * 1024 * 1024;
-        $capture_data = fopen("php://temp/maxmemory:$MBs", 'r+');
+    public function extract_from_archive($type) {
+        // Write one file from the archive to memory.
+        $extracted = false;
+        if (($type === "ar-zip") && ($this->setup->get('HAS_PHP_ZIP'))) {
+            $za = new ZipArchive();
+            $err = $za->open($this->source_path, ZipArchive::RDONLY);
+            if ($err) { // no error
+                for($i = 0; $i < $za->numFiles; $i++) {
+                    $entry = $za->getNameIndex($i);
+                    if (substr($entry, -1, 1) == '/') {
+                        // is directory
+                        continue;
+                    }
+                    // Deduce type from file extension
+                    $stat = $za->statIndex($i);
+                    $label =  $stat['name'];
+                    $tmp = explode(".", $label);
+                    $ext = end($tmp);
+                    if (!empty($ext) && array_search($ext, self::$IMG_EXT) !== false) {
+                        $extracted = fopen("php://temp/maxmemory:". 2 * 1024 * 1024, 'r+');
+                        fwrite($extracted, $za->getFromIndex($i));
+                        break;
+                    }
+                }
+                $za->close();
+                return $extracted;
+            } else if ($err === ZipArchive::ER_NOZIP) {
+                throw new WrongType("Not a zip file", $err);
+            } else {
+                throw new Exception("Unhandled Zip error", $err);
+            }
+        }
+        if (($type === "ar-rar") && ($this->setup->get('HAS_PHP_RAR'))) {
+            $rar = RarArchive::open($this->source_path);
+            if (!$rar) {
+                throw new UnhandledArchive("Error opening rar archive", 4);
+            }
+            $entries = $rar->getEntries();
+            // FIXME perhaps sort labels only instead?
+            sort($entries, SORT_NATURAL);
+            foreach ($entries as $entry) {
+                if ($entry->isDirectory()) continue;
+                $label = $entry->getName();
+                $tmp = explode(".", $label);
+                $ext = end($tmp);
+                if (!empty($ext) && array_search($ext, self::$IMG_EXT) !== false) {
+                    $stream = $entry->getStream();
+                    if ($stream !== false) {
+                        $extracted = fopen("php://temp/maxmemory:". 2 * 1024 * 1024, 'r+');
+                        fwrite($extracted, stream_get_contents($stream));
+                        fclose($stream);
+                        break;
+                    }
+                }
+            }
+            $rar->close();
+            return $extracted;
+        }
+
+        // return $extracted;
+        throw new UnhandledArchive("No handler for archive of type $type.", 2);
+    }
+
+    public function do_capture_img($source) {
+        $image = new Image($source);
+
+        $capture_data = fopen("php://temp/maxmemory:". 2 * 1024 * 1024, 'r+');
 
         $et = false;
         if ($this->setup->get('HAS_PHP_EXIF') && $this->context->query_option('thumbnails.exif', false) === true) {
-            $et = @exif_thumbnail($this->source_path);
+            $et = @exif_thumbnail($source);
         }
         if($et !== false) {
-            rewind($capture_data);  // Make sure we don't append
+            rewind($capture_data);
             fwrite($capture_data, $et);
 
             $is_valid = $image->set_source_data($capture_data);
-            $image->normalize_exif_orientation($this->source_path);
+            $image->normalize_exif_orientation($source);
+        } else if (is_resource($source)) {
+            // we assume this is a valid image resource...
+            $is_valid = $image->set_source_data($source);
+            fclose($source);
         } else {
-            $input_file  = fopen($this->source_path, 'r');
+            // source is a path string
+            $input_file  = fopen($source, 'r');
             stream_copy_to_stream($input_file, $capture_data);
             fclose($input_file);
             $is_valid = $image->set_source_data($capture_data);
@@ -234,27 +339,26 @@ class Thumb {
         }
         $image = new Image($this->source_path);
 
-        // If the result is more than 2MiB, write it to /tmp
-        $MBs = 2 * 1024 * 1024;
-        $capture_data = fopen("php://temp/maxmemory:$MBs", 'r+');
+        // Allocate 2MiB, write it to /tmp if bigger
+        $capture_data = fopen("php://temp/maxmemory:". 2 * 1024 * 1024, 'r+');
 
         $error = null;
         $exit = Util::proc_open_cmdv($cmdv, $capture_data, $error);
 
         // Make sure our output is a valid image
         rewind($capture_data);
-        $data = fread($capture_data, 3);
+        $magic = fread($capture_data, 3);
         // Instead of parsing the child process' stderror stream for actual errors,
         // simply make sure the stdout stream start with the JPEG magic number
-        $is_image = (!empty($data)) ? (bin2hex($data) === 'ffd8ff') : false;
+        $is_image = (!empty($magic)) ? (bin2hex($magic) === 'ffd8ff') : false;
 
-        if (!$is_image){
+        if (!$is_image) {
             fclose($capture_data);
             throw new Exception($error);
         }
         $success = $image->set_source_data($capture_data);
         fclose($capture_data);
-        if (!$success){
+        if (!$success) {
             return false;
         }
         if ($this->image === null) {
@@ -314,8 +418,7 @@ class Image {
 
         rewind($fp);
         try {
-            $this->source = imagecreatefromstring(
-                stream_get_contents($fp));
+            $this->source = @imagecreatefromstring(stream_get_contents($fp));
         } catch (Exception $e) {
             $this->source = null;
             return false;
@@ -410,7 +513,6 @@ class Image {
             return;
         }
 
-        //FIXME once rotated, prevent further rotations since we keep $this->source in memory
         $this->source = imagerotate($this->source, $angle, 0);
         if ( $angle === 90 || $angle === 270 ) {
             list($this->width, $this->height) = [$this->height, $this->width];
@@ -440,3 +542,6 @@ class Image {
         }
     }
 }
+
+class UnhandledArchive extends Exception {}
+class WrongType extends Exception {}

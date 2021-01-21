@@ -108,6 +108,16 @@ const addTests = () => {
     );
 
     addTest(
+        'Zip module', 'PHP Zip extension is available',
+        setup.HAS_PHP_ZIP
+    );
+
+    addTest(
+        'Rar module', 'PHP Rar extension is available',
+        setup.HAS_PHP_RAR
+    );
+
+    addTest(
         'Use EXIF thumbs', 'PHP EXIF extension available',
         setup.HAS_PHP_EXIF
     );
@@ -128,8 +138,13 @@ const addTests = () => {
     );
 
     addTest(
-        'Shell zip', 'Command line program <code>zip</code> available',
-        setup.HAS_CMD_ZIP
+        'Shell unzip', 'Command line program <code>unzip</code> available',
+        setup.HAS_CMD_UNZIP
+    );
+
+    addTest(
+        'Shell unrar', 'Command line program <code>unrar</code> available',
+        setup.HAS_CMD_UNRAR
     );
 
     addTest(

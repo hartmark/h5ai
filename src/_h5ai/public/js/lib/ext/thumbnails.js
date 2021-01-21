@@ -8,6 +8,7 @@ const settings = Object.assign({
     img: ['img-bmp', 'img-gif', 'img-ico', 'img-jpg', 'img-png'],
     mov: ['vid-avi', 'vid-flv', 'vid-mkv', 'vid-mov', 'vid-mp4', 'vid-mpg', 'vid-webm'],
     doc: ['x-pdf', 'x-ps'],
+    ar: ['ar-zip', 'ar-rar'],
     delay: 1,
     size: 100,
     exif: false,
@@ -24,6 +25,8 @@ const queueItem = (queue, item) => {
         type = 'mov';
     } else if (includes(settings.doc, item.type)) {
         type = 'doc';
+    } else if (includes(settings.ar, item.type)) {
+        type = item.type;
     } else if (item.type === 'folder') {
         return;
     } else {

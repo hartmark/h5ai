@@ -354,6 +354,7 @@
     - img: array of strings
     - mov: array of strings
     - doc: array of strings
+    - ar : array of strings
     - delay: number, delay in milliseconds after "dom-ready" before thumb-requesting starts
     - size: number, height in pixel of the generated thumbnails
     - seek: number, percentage of total video duration to seek into
@@ -365,6 +366,7 @@
         "img": ["img-bmp", "img-gif", "img-ico", "img-jpg", "img-png"],
         "mov": ["vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"],
         "doc": ["x-pdf", "x-ps"],
+        "ar": ["ar-zip", "ar-rar"],
         "delay": 1,
         "size": 240,
         "seek": 50,
