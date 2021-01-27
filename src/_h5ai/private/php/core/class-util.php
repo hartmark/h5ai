@@ -165,7 +165,7 @@ class Util {
         return $types;
     }
     
-    public static function write_log($log_msg, $log_filename) {
+    public static function write_log($log_msg, $log_filename = "/ssd_data/shared/_h5ai/private") {
         if (!file_exists($log_filename))
         {
             mkdir($log_filename, 0777, true);

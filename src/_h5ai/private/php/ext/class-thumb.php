@@ -64,8 +64,10 @@ class Thumb {
         // We have a cached handled failure, skip it
         $cached = $this->db->has_result($this->source_hash);
         if ($cached) {
-            error_log("RETURN NULL for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
+            Util::write_log("RETURN NULL for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
             return null;
+        } else {
+            Util::write_log("CONTINUE for " . $this->source_path . " hash: " . $this->source_hash);
         }
 
         if ($this->image !== null) {
@@ -115,7 +117,10 @@ class Thumb {
             if ($this->setup->get('HAS_PHP_FILEINFO')) {
                 $detected_type = Util::mime_to_type(
                     Util::get_mimetype($this->source_path));
+
                 $this->type = $detected_type;
+                $this->db->insert($this->source_hash, $detected_type, null);
+
                 if ($detected_type === 'file') {
                     return false;  // Giving up
                 }
@@ -169,6 +174,7 @@ class Thumb {
             }
             try {
                 $timestamp = $this->compute_duration($probe_cmd, $this->source_path);
+                // Swap SRC and DUR
                 $conv_cmd[6] = '-i';
                 $conv_cmd[7] = '[H5AI_SRC]';
                 $conv_cmd[8] = '-ss';
@@ -196,9 +202,10 @@ class Thumb {
                 return $this->do_capture_archive($this->source_path, $type);
             } catch (UnhandledArchive $e) {
                 error_log("Unhandled $this->source_path: ". $e->getMessage() . PHP_EOL);
-                $this->type = 'file';
                 // Cache failure result to avoid scanning again in the near future
-                $this->db->insert($this->source_hash, $e->getCode());
+                $this->db->insert($this->source_hash, $this->type, $e->getCode());
+                // Stop trying to guess the type
+                $this->type = 'file';
                 return false;
             } catch (WrongType $e) {
                 error_log("WrongType for $this->source_path: ". $e->getMessage() . PHP_EOL);

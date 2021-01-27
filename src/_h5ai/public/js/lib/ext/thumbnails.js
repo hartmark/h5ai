@@ -6,7 +6,7 @@ const allsettings = require('../core/settings');
 const settings = Object.assign({
     enabled: false,
     img: ['img-bmp', 'img-gif', 'img-ico', 'img-jpg', 'img-png'],
-    mov: ['vid-avi', 'vid-flv', 'vid-mkv', 'vid-mov', 'vid-mp4', 'vid-mpg', 'vid-webm'],
+    mov: ['vid-avi', 'vid-mkv', 'vid-flv', 'vid-swf', 'vid-mov', 'vid-mp4', 'vid-mpg', 'vid-webm'],
     doc: ['x-pdf', 'x-ps'],
     ar: ['ar-zip', 'ar-rar'],
     delay: 1,
@@ -22,7 +22,11 @@ const queueItem = (queue, item) => {
     if (includes(settings.img, item.type)) {
         type = 'img';
     } else if (includes(settings.mov, item.type)) {
-        type = 'mov';
+        if (item.type === 'vid-flv' || item.type === 'vid-swf') {
+            type = 'swf';
+        } else {
+            type = 'mov';
+        }
     } else if (includes(settings.doc, item.type)) {
         type = 'doc';
     } else if (includes(settings.ar, item.type)) {

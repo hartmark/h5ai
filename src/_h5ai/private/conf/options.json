@@ -364,7 +364,7 @@
     "thumbnails": {
         "enabled": true,
         "img": ["img-bmp", "img-gif", "img-ico", "img-jpg", "img-png"],
-        "mov": ["vid-avi", "vid-flv", "vid-mkv", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"],
+        "mov": ["vid-avi", "vid-mkv", "vid-flv", "vid-swf", "vid-mov", "vid-mp4", "vid-mpg", "vid-webm"],
         "doc": ["x-pdf", "x-ps"],
         "ar": ["ar-zip", "ar-rar"],
         "delay": 1,
