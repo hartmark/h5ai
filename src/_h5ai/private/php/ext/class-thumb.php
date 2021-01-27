@@ -113,18 +113,18 @@ class Thumb {
             return false;
         }
         ++$this->attempt;
-        if ($type === 'file'){
+        if ($type === 'file') {
             if ($this->setup->get('HAS_PHP_FILEINFO')) {
-                $detected_type = Util::mime_to_type(
+                $handler_type = Util::mime_to_handler_type(
                     Util::get_mimetype($this->source_path));
 
-                $this->type = $detected_type;
-                $this->db->insert($this->source_hash, $detected_type, null);
+                $this->type = $handler_type;
+                $this->db->insert($this->source_hash, $handler_type, null);
 
-                if ($detected_type === 'file') {
+                if ($handler_type === 'file') {
                     return false;  // Giving up
                 }
-                return $this->capture($detected_type);
+                return $this->capture($handler_type);
             }
             else {
                 $this->type = 'file';
