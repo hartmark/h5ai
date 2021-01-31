@@ -32,14 +32,26 @@ class CacheDB {
         }
         // FIXME use IF NOT EXIST to avoid checking with file_exists?
         $db = new SQLite3($path);
-        if ($db->exec('CREATE TABLE archives
-(hashedp TEXT NOT NULL UNIQUE,
-type TEXT,
-error INT,
-version INT,
-PRIMARY KEY("hashedp")
-);')) {
+        $this->create_type_table($db);
+        $db->exec('CREATE TABLE archives
+ (hashedp TEXT NOT NULL UNIQUE PRIMARY KEY,
+ typeid INTEGER,
+ error INTEGER,
+ version INTEGER,
+ FOREIGN KEY(typeid) REFERENCES types(id)
+ ) WITHOUT ROWID;');
+        // FIXME DEBUG
+        chmod($path, 0777);
         $this->conn = $db;
+    }
+
+    public function create_type_table($db) {
+        $db->exec('CREATE TABLE types
+(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+type TEXT UNIQUE);');
+
+        foreach (Util::AVAILABLE_TYPES as $type) {
+            $db->exec('INSERT OR IGNORE INTO types VALUES (NULL, \''. $type .'\')');
         }
     }
 
@@ -49,12 +61,19 @@ PRIMARY KEY("hashedp")
         }
         if (!$this->ins_stmt) {
             $this->ins_stmt = $this->conn->prepare(
-'INSERT OR REPLACE INTO archives VALUES (:id, :type, :err, :ver);');
+'INSERT OR REPLACE INTO archives VALUES (:id, :typeid, :err, :ver);');
         }
         $stmt = $this->ins_stmt;
         $stmt->reset();
         $stmt->bindValue(':id', $hash, SQLITE3_TEXT);
-        $stmt->bindValue(':type', $type, SQLITE3_TEXT);
+
+        $typeid = $this->conn->querySingle('SELECT id FROM types WHERE type = \''. $type .'\';');
+        if (!$typeid) {
+            Util::write_log("Inserting new type: $type");
+            $this->conn->exec('INSERT INTO types VALUES (NULL, \''. $type .'\')');
+            $typeid = $this->conn->querySingle('SELECT id FROM types WHERE type = \''. $type .'\';');
+        }
+        $stmt->bindValue(':typeid', $typeid, SQLITE3_INTEGER);
         $stmt->bindValue(':err', $error, SQLITE3_INTEGER);
         $stmt->bindValue(':ver', $this->version, SQLITE3_INTEGER);
 //         $stmt = 'INSERT OR REPLACE INTO archives VALUES
@@ -63,30 +82,41 @@ PRIMARY KEY("hashedp")
         $stmt->execute();
     }
 
-    public function has_result($hash) {
+    public function require_update($hash) {
         if (!$this->conn) {
             return [];
         }
         if (!$this->sel_stmt) {
             $this->sel_stmt = $this->conn->prepare(
-                'SELECT version FROM archives WHERE hashedp = :id;');
+                // 'SELECT version, type FROM archives WHERE hashedp = :id;');
+                'SELECT archives.version, types.type
+FROM archives, types
+WHERE hashedp = :id
+and archives.typeid = types.id;');
         }
         $stmt = $this->sel_stmt;
         $stmt->reset();
         $stmt->bindValue(':id', $hash, SQLITE3_TEXT);
         $res = $stmt->execute();
 
-        // $res = $this->conn->query('SELECT version FROM archives where hashedp = \'' . $hash . '\';');
+        // $res = $this->conn->querySingle('SELECT version FROM archives where hashedp = \'' . $hash . '\';', true);
 
-        $row = $res->fetchArray();
+        $row = $res->fetchArray(SQLITE3_ASSOC);
+        // $res->finalize();
 
         if ($row) {
-            Util::write_log("FOUND ROW for $hash");
+            Util::write_log("FOUND ROW for $hash: ". print_r($row, true));
         } else {
             Util::write_log("NO ROW for $hash");
         }
 
-        return $row ? !$this->updated_handlers($row) : $row;
+        if (!$row) {
+            return false;
+        }
+        if ($this->updated_handlers($row)) {
+            return true; // Force updating this entry
+        }
+        return $row['type'];
     }
 
     public function updated_handlers($row) {

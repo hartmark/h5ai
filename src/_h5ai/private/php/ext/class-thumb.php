@@ -1,14 +1,14 @@
 <?php
 
 class Thumb {
-    private static $FFMPEG_CMDV = ['ffmpeg', '-v', 'warning', '-nostdin', '-y', '-hide_banner', '-ss', '[H5AI_DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '-f', 'image2', '-'];
-    private static $FFPROBE_CMDV = ['ffprobe', '-v', 'warning', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
-    private static $AVCONV_CMDV = ['avconv', '-v', 'warning', '-nostdin', '-y', '-hide_banner', '-ss', '[H5AI_DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '-f', 'image2', '-'];
-    private static $AVPROBE_CMDV = ['avprobe', '-v', 'warning', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
-    private static $CONVERT_CMDV = ['convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
-    private static $GM_CONVERT_CMDV = ['gm', 'convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
-    private static $THUMB_CACHE = 'thumbs';
-    private static $IMG_EXT = ['jpg', 'jpe', 'jpeg', 'jp2', 'jpx', 'tiff', 'webp', 'ico', 'png', 'bmp', 'gif'];
+    const FFMPEG_CMDV = ['ffmpeg', '-v', 'warning', '-nostdin', '-y', '-hide_banner', '-ss', '[H5AI_DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '-f', 'image2', '-'];
+    const FFPROBE_CMDV = ['ffprobe', '-v', 'warning', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
+    const AVCONV_CMDV = ['avconv', '-v', 'warning', '-nostdin', '-y', '-hide_banner', '-ss', '[H5AI_DUR]', '-i', '[H5AI_SRC]', '-an', '-vframes', '1', '-f', 'image2', '-'];
+    const AVPROBE_CMDV = ['avprobe', '-v', 'warning', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', '[H5AI_SRC]'];
+    const CONVERT_CMDV = ['convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
+    const GM_CONVERT_CMDV = ['gm', 'convert', '-density', '200', '-quality', '100', '-strip', '[H5AI_SRC][0]', 'JPG:-'];
+    const THUMB_CACHE = 'thumbs';
+    const IMG_EXT = ['jpg', 'jpe', 'jpeg', 'jp2', 'jpx', 'tiff', 'webp', 'ico', 'png', 'bmp', 'gif'];
 
     private $context;
     private $setup;
@@ -22,8 +22,8 @@ class Thumb {
         $this->context = $context;
         $this->setup = $context->get_setup();
         $this->db = $db;
-        $this->thumbs_path = $this->setup->get('CACHE_PUB_PATH') . '/' . self::$THUMB_CACHE;
-        $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . self::$THUMB_CACHE;
+        $this->thumbs_path = $this->setup->get('CACHE_PUB_PATH') . '/' . self::THUMB_CACHE;
+        $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . self::THUMB_CACHE;
         $this->source_path = $source_path;
         $this->type = $type;
         $this->source_hash = sha1($source_path);
@@ -62,10 +62,11 @@ class Thumb {
         }
 
         // We have a cached handled failure, skip it
-        $cached = $this->db->has_result($this->source_hash);
-        if ($cached) {
-            Util::write_log("RETURN NULL for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
+        $cached_type = $this->db->require_update($this->source_hash, $this->type);
+        if ($cached_type) {
+            Util::write_log("CACHED TYPE '$cached_type' for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
             return null;
+            //TODO or return the type to the view if we have one in DB
         } else {
             Util::write_log("CONTINUE for " . $this->source_path . " hash: " . $this->source_hash);
         }
@@ -147,11 +148,11 @@ class Thumb {
         }
         else if ($type === 'mov') {
             if ($this->setup->get('HAS_CMD_FFMPEG')) {
-                $probe_cmd = self::$FFPROBE_CMDV;
-                $conv_cmd = self::$FFMPEG_CMDV;
+                $probe_cmd = self::FFPROBE_CMDV;
+                $conv_cmd = self::FFMPEG_CMDV;
             } else if ($this->setup->get('HAS_CMD_AVCONV')) {
-                $probe_cmd = self::$AVPROBE_CMDV;
-                $conv_cmd = self::$AVCONV_CMDV;
+                $probe_cmd = self::AVPROBE_CMDV;
+                $conv_cmd = self::AVCONV_CMDV;
             } else {
                 return false;
             }
@@ -164,11 +165,11 @@ class Thumb {
         }
         else if ($type === 'swf'){
             if ($this->setup->get('HAS_CMD_FFMPEG')) {
-                $probe_cmd = self::$FFPROBE_CMDV;
-                $conv_cmd = self::$FFMPEG_CMDV;
+                $probe_cmd = self::FFPROBE_CMDV;
+                $conv_cmd = self::FFMPEG_CMDV;
             } else if ($this->setup->get('HAS_CMD_AVCONV')) {
-                $probe_cmd = self::$AVPROBE_CMDV;
-                $conv_cmd = self::$AVCONV_CMDV;
+                $probe_cmd = self::AVPROBE_CMDV;
+                $conv_cmd = self::AVCONV_CMDV;
             } else {
                 return false;
             }
@@ -187,9 +188,9 @@ class Thumb {
         else if ($type === 'doc') {
             try {
                 if ($this->setup->get('HAS_CMD_GM')) {
-                    return $this->do_capture(self::$GM_CONVERT_CMDV);
+                    return $this->do_capture(self::GM_CONVERT_CMDV);
                 } else if ($this->setup->get('HAS_CMD_CONVERT')) {
-                    return $this->do_capture(self::$CONVERT_CMDV);
+                    return $this->do_capture(self::CONVERT_CMDV);
                 } else {
                     return false;
                 }
@@ -247,7 +248,7 @@ class Thumb {
                     $label =  $stat['name'];
                     $tmp = explode(".", $label);
                     $ext = end($tmp);
-                    if (!empty($ext) && array_search($ext, self::$IMG_EXT) !== false) {
+                    if (!empty($ext) && array_search($ext, self::IMG_EXT) !== false) {
                         $extracted = fopen("php://temp/maxmemory:". 2 * 1024 * 1024, 'r+');
                         fwrite($extracted, $za->getFromIndex($i));
                         break;
@@ -274,7 +275,7 @@ class Thumb {
                 $label = $entry->getName();
                 $tmp = explode(".", $label);
                 $ext = end($tmp);
-                if (!empty($ext) && array_search($ext, self::$IMG_EXT) !== false) {
+                if (!empty($ext) && array_search($ext, self::IMG_EXT) !== false) {
                     $stream = $entry->getStream();
                     if ($stream !== false) {
                         $extracted = fopen("php://temp/maxmemory:". 2 * 1024 * 1024, 'r+');

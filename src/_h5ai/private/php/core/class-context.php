@@ -253,6 +253,7 @@ class Context {
 
         $db = new CacheDB($this->setup);
 
+        // FIXME the client is still free to choose what is blocked or not!
         foreach ($requests as $req) {
             if ($req['type'] === 'blocked') {
                 $hrefs[] = null;
