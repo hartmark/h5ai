@@ -15,8 +15,10 @@ class CacheDB {
     }
 
     public function __destruct() {
-        if (isset($this->conn)) {
-            $this->conn->close();
+        foreach ([$this->conn, $this->sel_stmt, $this->ins_stmt] as $prop) {
+            if (isset($prop)) {
+                $prop->close();
+            }
         }
     }
 
@@ -55,7 +57,7 @@ type TEXT UNIQUE);');
         }
     }
 
-    public function insert($hash, $type, $error) {
+    public function insert($hash, $type, $error = null) {
         if (!$this->conn) {
             return;
         }
@@ -82,7 +84,7 @@ type TEXT UNIQUE);');
         $stmt->execute();
     }
 
-    public function require_update($hash) {
+    public function get_entry($hash) {
         if (!$this->conn) {
             return [];
         }
@@ -102,21 +104,15 @@ and archives.typeid = types.id;');
         // $res = $this->conn->querySingle('SELECT version FROM archives where hashedp = \'' . $hash . '\';', true);
 
         $row = $res->fetchArray(SQLITE3_ASSOC);
-        // $res->finalize();
+        $res->finalize();
 
+        // DEBUG
         if ($row) {
             Util::write_log("FOUND ROW for $hash: ". print_r($row, true));
         } else {
             Util::write_log("NO ROW for $hash");
         }
-
-        if (!$row) {
-            return false;
-        }
-        if ($this->updated_handlers($row)) {
-            return true; // Force updating this entry
-        }
-        return $row['type'];
+        return $row;
     }
 
     public function updated_handlers($row) {

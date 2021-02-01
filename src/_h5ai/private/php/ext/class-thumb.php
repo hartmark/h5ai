@@ -25,7 +25,8 @@ class Thumb {
         $this->thumbs_path = $this->setup->get('CACHE_PUB_PATH') . '/' . self::THUMB_CACHE;
         $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . self::THUMB_CACHE;
         $this->source_path = $source_path;
-        $this->type = $type;
+        // TODO parse the path for file extension here, like the client does
+        $this->type = new FileType($type);
         $this->source_hash = sha1($source_path);
         $this->capture_data = false;
         $this->thumb_path = null;
@@ -53,20 +54,19 @@ class Thumb {
         $this->thumb_href = $this->thumbs_href . '/' . $name;
 
         if (file_exists($this->thumb_path) && filemtime($this->source_path) <= filemtime($this->thumb_path)) {
-            if ($this->type === 'file') {
-                // This one was previously detected as able to generate thumbnail,
-                // if we leave 'file' as type, this would block the next requests
-                $this->type = '';
+            $row = $this->db->get_entry($this->source_hash);
+            if ($row) {
+                // Notify the client that their type detection was wrong so they should update it
+                $this->type->name = $row['type'];
             }
             return $this->thumb_href;
         }
 
         // We have a cached handled failure, skip it
-        $cached_type = $this->db->require_update($this->source_hash, $this->type);
-        if ($cached_type) {
-            Util::write_log("CACHED TYPE '$cached_type' for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
+        $row = $this->db->get_entry($this->source_hash, $this->type->name);
+        if ($row && !$this->db->updated_handlers($row)) {
+            Util::write_log("CACHED TYPE ". $row['type'] ." for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
             return null;
-            //TODO or return the type to the view if we have one in DB
         } else {
             Util::write_log("CONTINUE for " . $this->source_path . " hash: " . $this->source_hash);
         }
@@ -76,20 +76,24 @@ class Thumb {
             return $this->thumb_href($width, $height);
         }
 
-        $types = Util::get_types_array($this->type);
+        $types = Util::get_types_array($this->type->name);
         $thumb_href = null;
 
         /* Hopefully, the first type is the right one, but in the off chance
            that it is not, we'll shift to test the subsequent ones. */
         foreach($types as $type) {
+            $this->type->name = $type;
             if (!$this->capture($type)) {
-                if ($this->type === 'file') {
+                if ($this->type->name === 'file') {
                     break;  // We have tried as a file but failed
                 }
                 continue;
             }
             $thumb_href = $this->thumb_href($width, $height);
             if (!is_null($thumb_href)) {
+                if ($this->type->was_wrong()) {
+                    $this->db->insert($this->source_hash, $this->type->name);
+                }
                 return $thumb_href;
             }
         }
@@ -115,11 +119,12 @@ class Thumb {
         }
         ++$this->attempt;
         if ($type === 'file') {
+            $this->type->name = 'file';
             if ($this->setup->get('HAS_PHP_FILEINFO')) {
                 $handler_type = Util::mime_to_handler_type(
                     Util::get_mimetype($this->source_path));
 
-                $this->type = $handler_type;
+                $this->type->name = $handler_type;
                 $this->db->insert($this->source_hash, $handler_type, null);
 
                 if ($handler_type === 'file') {
@@ -128,7 +133,7 @@ class Thumb {
                 return $this->capture($handler_type);
             }
             else {
-                $this->type = 'file';
+                $this->type->name = 'file';
                 return false;
             }
         }
@@ -144,6 +149,7 @@ class Thumb {
                 }
             }
             $success = $this->do_capture_img($this->source_path);
+            Util::write_log("Done capture for img $this->source_path success: ". print_r($success, true));
             return $success ? $success : $this->capture('file');
         }
         else if ($type === 'mov') {
@@ -204,15 +210,15 @@ class Thumb {
             } catch (UnhandledArchive $e) {
                 error_log("Unhandled $this->source_path: ". $e->getMessage() . PHP_EOL);
                 // Cache failure result to avoid scanning again in the near future
-                $this->db->insert($this->source_hash, $this->type, $e->getCode());
+                $this->db->insert($this->source_hash, $this->type->name, $e->getCode());
                 // Stop trying to guess the type
-                $this->type = 'file';
+                $this->type->name = 'file';
                 return false;
             } catch (WrongType $e) {
                 error_log("WrongType for $this->source_path: ". $e->getMessage() . PHP_EOL);
                 return $this->capture('file');
             } catch (Exception $e) { // Probably shouldn't cache this one.
-                $this->type = 'file';
+                $this->type->name = 'file';
             }
         }
         return false;
@@ -549,6 +555,36 @@ class Image {
                 break;
         }
     }
+}
+
+class FileType {
+    private $name;
+    private $has_changed;
+
+    public function __construct($name = null) {
+        $this->name = $name;
+        $this->has_changed = false;
+    }
+
+    public function __get($property) {
+        if (property_exists($this, $property)) {
+            return $this->$property;
+        }
+    }
+
+    public function __set($property, $value) {
+        if (property_exists($this, $property)) {
+            if ($value !== $this->$property) {
+                $this->$property = $value;
+                $this->has_changed = true;
+            }
+        }
+        return $this;
+	}
+
+	public function was_wrong() {
+		return $this->has_changed;
+	}
 }
 
 class UnhandledArchive extends Exception {}

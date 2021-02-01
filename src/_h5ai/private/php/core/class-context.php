@@ -248,6 +248,8 @@ class Context {
     public function get_thumbs($requests) {
         $hrefs = [];
         $thumbs = [];
+        $filetypes = [];
+
         $height = $this->options['thumbnails']['size'] ?? 240;
         $width = floor($height * (4 / 3));
 
@@ -257,20 +259,29 @@ class Context {
         foreach ($requests as $req) {
             if ($req['type'] === 'blocked') {
                 $hrefs[] = null;
+                $filetypes[] = null;
                 continue;
             }
             $path = $this->to_path($req['href']);
             if (!array_key_exists($path, $thumbs)) {
                 $thumbs[$path] = new Thumb($this, $path, $req['type'], $db);
             }
-            else if ($thumbs[$path]->type === 'file') {
+            else if ($thumbs[$path]->type->name === 'file') {
                 // File has already been mime tested and cannot have a thumbnail
+                // This is a security measure, as it only really applies if we
+                // request the same path again in the same request
                 $hrefs[] = null;
+                $filetypes[] = 'file';
                 continue;
             }
             $hrefs[] = $thumbs[$path]->thumb($width, $height);
+            if ($thumbs[$path]->type->was_wrong()) {
+                $filetypes[] = $thumbs[$path]->type->name;
+            } else {
+                $filetypes[] = null;
+            }
         }
-        return $hrefs;
+        return [$hrefs, $filetypes];
     }
 
     public function write_log($msg){
