@@ -234,6 +234,7 @@ Session.prototype = {
 
 const register = (types, load, adjust) => {
     const initItem = item => {
+        console.log(`initItem(${item.label} with type ${item.type})`);
         if (item.$view && includes(types, item.type)) {
             item.$view.find('a').on('click', ev => {
                 ev.preventDefault();
@@ -250,6 +251,7 @@ const register = (types, load, adjust) => {
     };
 
     event.sub('view.changed', added => each(added, initItem));
+    event.sub('item.changed', changed => initItem(changed));
 };
 
 const init = () => {

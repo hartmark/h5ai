@@ -10,6 +10,17 @@ class Thumb {
     const THUMB_CACHE = 'thumbs';
     const IMG_EXT = ['jpg', 'jpe', 'jpeg', 'jp2', 'jpx', 'tiff', 'webp', 'ico', 'png', 'bmp', 'gif'];
 
+    // 'file' has to be the last item!
+    public const AVAILABLE_HANDLERS = ['img', 'mov', 'doc', 'swf', 'ar-zip', 'ar-rar', 'file'];
+    public const HANDLED_TYPES = array(
+        'img' => ['img', 'img-bmp', 'img-jpg', 'img-gif', 'img-png', 'img-raw', 'img-tiff', 'img-svg'],
+        'mov' => ['vid-mp4', 'vid-webm', 'vid-rm', 'vid-mpg', 'vid-avi', 'vid-mkv', 'vid-mov'],
+        'swf' => ['vid-swf', 'vid-flv'],
+        'doc' => ['x-ps', 'x-pdf'],
+        'ar-zip' => ['ar', 'ar-zip', 'ar-cbr'],
+        'ar-rar' => ['ar-rar'],
+    );
+
     private $context;
     private $setup;
     private $thumbs_path;
@@ -26,7 +37,7 @@ class Thumb {
         $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . self::THUMB_CACHE;
         $this->source_path = $source_path;
         // TODO parse the path for file extension here, like the client does
-        $this->type = new FileType($type);
+        $this->type = new FileType($context, $type);
         $this->source_hash = sha1($source_path);
         $this->capture_data = false;
         $this->thumb_path = null;
@@ -56,19 +67,20 @@ class Thumb {
         if (file_exists($this->thumb_path) && filemtime($this->source_path) <= filemtime($this->thumb_path)) {
             $row = $this->db->get_entry($this->source_hash);
             if ($row) {
-                // Notify the client that their type detection was wrong so they should update it
+                // Notify the client that we know their type detection was wrong,
+                // so they should update it in order to display preview properly.
                 $this->type->name = $row['type'];
             }
             return $this->thumb_href;
         }
 
         // We have a cached handled failure, skip it
-        $row = $this->db->get_entry($this->source_hash, $this->type->name);
-        if ($row && !$this->db->updated_handlers($row)) {
-            Util::write_log("CACHED TYPE ". $row['type'] ." for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
+        $row = $this->db->get_entry($this->source_hash);
+        if ($row && !$this->db->updated_handlers($row['handlers'])) {
+            Util::write_log("CACHED TYPE: \"". $row['type'] ."\" for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
             return null;
         } else {
-            Util::write_log("CONTINUE for " . $this->source_path . " hash: " . $this->source_hash);
+            Util::write_log("CONTINUE for " . $this->source_path . " hash: " . $this->source_hash . " of maybe type: ". $this->type->name);
         }
 
         if ($this->image !== null) {
@@ -76,14 +88,14 @@ class Thumb {
             return $this->thumb_href($width, $height);
         }
 
-        $types = Util::get_types_array($this->type->name);
+        $handlers = self::get_handlers_array($this->type->handler);
         $thumb_href = null;
 
         /* Hopefully, the first type is the right one, but in the off chance
            that it is not, we'll shift to test the subsequent ones. */
-        foreach($types as $type) {
-            $this->type->name = $type;
-            if (!$this->capture($type)) {
+        foreach($handlers as $handler) {
+            // $this->type->handler = $handler;  // FIXME should be type
+            if (!$this->capture($handler)) {
                 if ($this->type->name === 'file') {
                     break;  // We have tried as a file but failed
                 }
@@ -113,35 +125,37 @@ class Thumb {
         return null;
     }
 
-    private function capture($type) {
-        if ($this->attempt >= count(Util::AVAILABLE_TYPES)) {
+    private function capture($handler) {
+        if ($this->attempt >= count(self::AVAILABLE_HANDLERS)) {
             return false;
         }
         ++$this->attempt;
-        if ($type === 'file') {
-            $this->type->name = 'file';
+        if ($handler === 'file') {
+            // $this->type->name = 'file';
             if ($this->setup->get('HAS_PHP_FILEINFO')) {
-                $handler_type = Util::mime_to_handler_type(
+                $type = $this->type->mime_to_type(
                     Util::get_mimetype($this->source_path));
+                $handler = $this->type->type_to_handler($type);
 
-                $this->type->name = $handler_type;
-                $this->db->insert($this->source_hash, $handler_type, null);
+                Util::write_log("Fileinfo detected for $this->source_path is $type handler $handler");
+                $this->type->name = $type;  // map to type from types.json
+                $this->db->insert($this->source_hash, $type, null);
 
-                if ($handler_type === 'file') {
+                if ($handler === 'file') {
                     return false;  // Giving up
                 }
-                return $this->capture($handler_type);
+                return $this->capture($handler);
             }
             else {
                 $this->type->name = 'file';
                 return false;
             }
         }
-        else if ($type === 'img') {
+        else if ($handler === 'img') {
             if ($this->setup->get('HAS_PHP_EXIF')) {
                 $exiftype = exif_imagetype($this->source_path);
                 if (!$exiftype) {
-                    return false;
+                    return $this->capture('file');
                 }
                 //       IMAGETYPE_SWF      IMAGETYPE_SWC
                 else if ($exiftype === 4 || $exiftype === 13) {
@@ -152,7 +166,7 @@ class Thumb {
             Util::write_log("Done capture for img $this->source_path success: ". print_r($success, true));
             return $success ? $success : $this->capture('file');
         }
-        else if ($type === 'mov') {
+        else if ($handler === 'mov') {
             if ($this->setup->get('HAS_CMD_FFMPEG')) {
                 $probe_cmd = self::FFPROBE_CMDV;
                 $conv_cmd = self::FFMPEG_CMDV;
@@ -169,7 +183,7 @@ class Thumb {
                 return $this->capture('file');
             }
         }
-        else if ($type === 'swf'){
+        else if ($handler === 'swf'){
             if ($this->setup->get('HAS_CMD_FFMPEG')) {
                 $probe_cmd = self::FFPROBE_CMDV;
                 $conv_cmd = self::FFMPEG_CMDV;
@@ -191,7 +205,7 @@ class Thumb {
                 return $this->capture('file');
             }
         }
-        else if ($type === 'doc') {
+        else if ($handler === 'doc') {
             try {
                 if ($this->setup->get('HAS_CMD_GM')) {
                     return $this->do_capture(self::GM_CONVERT_CMDV);
@@ -204,20 +218,20 @@ class Thumb {
                 return $this->capture('file');
             }
         }
-        else if (strpos($type, 'ar') !== false) {
+        else if (strpos($handler, 'ar') !== false) {
             try {
-                return $this->do_capture_archive($this->source_path, $type);
+                return $this->do_capture_archive($this->source_path, $handler);
             } catch (UnhandledArchive $e) {
-                error_log("Unhandled $this->source_path: ". $e->getMessage() . PHP_EOL);
-                // Cache failure result to avoid scanning again in the near future
+                Util::write_log("Unhandled $this->source_path: ". $e->getMessage() . PHP_EOL);
+                // Cache failure result to avoid scanning again in the future
                 $this->db->insert($this->source_hash, $this->type->name, $e->getCode());
                 // Stop trying to guess the type
                 $this->type->name = 'file';
                 return false;
             } catch (WrongType $e) {
-                error_log("WrongType for $this->source_path: ". $e->getMessage() . PHP_EOL);
+                Util::write_log("WrongType for $this->source_path: ". $e->getMessage() . PHP_EOL);
                 return $this->capture('file');
-            } catch (Exception $e) { // Probably shouldn't cache this one.
+            } catch (Exception $e) { // Probably shouldn't cache this one
                 $this->type->name = 'file';
             }
         }
@@ -238,11 +252,11 @@ class Thumb {
 
     public function extract_from_archive($type) {
         // Write one file from the archive to memory.
-        $extracted = false;
         if (($type === "ar-zip") && ($this->setup->get('HAS_PHP_ZIP'))) {
             $za = new ZipArchive();
             $err = $za->open($this->source_path, ZipArchive::RDONLY);
-            if ($err) { // no error
+            $extracted = false;
+            if ($err === true) { // No Error
                 for($i = 0; $i < $za->numFiles; $i++) {
                     $entry = $za->getNameIndex($i);
                     if (substr($entry, -1, 1) == '/') {
@@ -265,6 +279,7 @@ class Thumb {
             } else if ($err === ZipArchive::ER_NOZIP) {
                 throw new WrongType("Not a zip file", $err);
             } else {
+                // Despite these errors, we can probably try again later.
                 throw new Exception("Unhandled Zip error", $err);
             }
         }
@@ -273,6 +288,7 @@ class Thumb {
             if (!$rar) {
                 throw new UnhandledArchive("Error opening rar archive", 4);
             }
+            $extracted = false;
             $entries = $rar->getEntries();
             // FIXME perhaps sort labels only instead?
             sort($entries, SORT_NATURAL);
@@ -294,7 +310,6 @@ class Thumb {
             $rar->close();
             return $extracted;
         }
-
         // return $extracted;
         throw new UnhandledArchive("No handler for archive of type $type.", 2);
     }
@@ -315,7 +330,7 @@ class Thumb {
             $is_valid = $image->set_source_data($capture_data);
             $image->normalize_exif_orientation($source);
         } else if (is_resource($source)) {
-            // we assume this is a valid image resource...
+            // we assume this is a valid image resource
             $is_valid = $image->set_source_data($source);
             fclose($source);
         } else {
@@ -359,11 +374,10 @@ class Thumb {
         $error = null;
         $exit = Util::proc_open_cmdv($cmdv, $capture_data, $error);
 
-        // Make sure our output is a valid image
         rewind($capture_data);
         $magic = fread($capture_data, 3);
         // Instead of parsing the child process' stderror stream for actual errors,
-        // simply make sure the stdout stream start with the JPEG magic number
+        // making sure the stdout stream starts with the JPEG magic number is enough
         $is_image = (!empty($magic)) ? (bin2hex($magic) === 'ffd8ff') : false;
 
         if (!$is_image) {
@@ -401,6 +415,17 @@ class Thumb {
             floatval($this->context->query_option('thumbnails.seek', 50)) / 100),
             1, PHP_ROUND_HALF_UP)
         );
+    }
+
+    public static function get_handlers_array($type) {
+        /* Return an array of possible types, with $type as the first element. */
+        $types = self::AVAILABLE_HANDLERS;
+        $key = array_search($type, $types);
+        if ($key !== false) {
+            unset($types[$key]);
+            array_unshift($types, $type);
+        }
+        return $types;
     }
 }
 
@@ -560,10 +585,14 @@ class Image {
 class FileType {
     private $name;
     private $has_changed;
+    private $context;
+    public $handler;
 
-    public function __construct($name = null) {
+    public function __construct($context, $name = null) {
         $this->name = $name;
+        $this->context = $context;
         $this->has_changed = false;
+        $this->handler = $this->type_to_handler($name);
     }
 
     public function __get($property) {
@@ -584,7 +613,32 @@ class FileType {
 
 	public function was_wrong() {
 		return $this->has_changed;
-	}
+    }
+
+    public function type_to_handler($type) {
+        foreach(array_keys(Thumb::HANDLED_TYPES) as $key) {
+            if (array_search($type,
+                    Thumb::HANDLED_TYPES[$key]) !== false) {
+                return $key;
+            }
+        }
+        return 'file';
+    }
+
+    public function mime_to_type($mime) {
+        foreach($this->context->get_types() as $key => $values) {
+            if (count($values) < 2) {
+                // No mime found, only glob left.
+                continue;
+            }
+            foreach($values['mime'] as $test) {
+                if (strpos($mime, $test) !== false) {
+                    return $key;
+                }
+            }
+        }
+        return 'file';
+    }
 }
 
 class UnhandledArchive extends Exception {}

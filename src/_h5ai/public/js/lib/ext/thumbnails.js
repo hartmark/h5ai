@@ -17,26 +17,16 @@ const defaults = {
 };
 const default_types = defaults.img.concat(defaults.mov, defaults.doc, defaults.ar);
 const settings = Object.assign(defaults, allsettings.thumbnails);
+const current_settings = settings.img.concat(settings.mov, settings.doc, settings.ar);
 settings.blocklist = settings.blocklist.concat(
-    difference(default_types,
-        settings.img.concat(settings.mov, settings.doc, settings.ar)));
+    difference(default_types, current_settings));
 
 const queueItem = (queue, item) => {
     let type = null;
 
     if (includes(settings.blocklist, item.type)) {
         type = 'blocked';
-    } else if (includes(settings.img, item.type)) {
-        type = 'img';
-    } else if (includes(settings.mov, item.type)) {
-        if (item.type === 'vid-flv' || item.type === 'vid-swf') {
-            type = 'swf';
-        } else {
-            type = 'mov';
-        }
-    } else if (includes(settings.doc, item.type)) {
-        type = 'doc';
-    } else if (includes(settings.ar, item.type)) {
+    } else if (includes(current_settings, item.type)) {
         type = item.type;
     } else if (item.type === 'folder') {
         return;
@@ -54,6 +44,13 @@ const queueItem = (queue, item) => {
                 if (src && item.$view) {
                     item.thumbRational = src;
                     item.$view.find('.icon img').addCls('thumb').attr('src', src);
+                }
+            },
+            callback_type: filetype => {
+                console.log(`Updating type for ${item.absHref}: ${filetype}`)
+                if (filetype && item.$view) {
+                    item.type = filetype;
+                    event.pub('item.changed', item);
                 }
             }
         });
@@ -73,7 +70,14 @@ const requestQueue = queue => {
         thumbs
     }).then(json => {
         each(queue, (req, idx) => {
-            req.callback(json && json.thumbs ? json.thumbs[idx] : null);
+            if (json) {
+                if (json.thumbs) {
+                    req.callback(json.thumbs[idx]);
+                }
+                if (json.filetypes) {
+                    req.callback_type(json.filetypes[idx]);
+                }
+            }
         });
     });
 };

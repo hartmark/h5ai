@@ -15,10 +15,8 @@ class CacheDB {
     }
 
     public function __destruct() {
-        foreach ([$this->conn, $this->sel_stmt, $this->ins_stmt] as $prop) {
-            if (isset($prop)) {
-                $prop->close();
-            }
+        if (isset($this->conn)) {
+            $this->conn->close();
         }
     }
 
@@ -39,7 +37,7 @@ class CacheDB {
  (hashedp TEXT NOT NULL UNIQUE PRIMARY KEY,
  typeid INTEGER,
  error INTEGER,
- version INTEGER,
+ handlers INTEGER,
  FOREIGN KEY(typeid) REFERENCES types(id)
  ) WITHOUT ROWID;');
         // FIXME DEBUG
@@ -52,7 +50,7 @@ class CacheDB {
 (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 type TEXT UNIQUE);');
 
-        foreach (Util::AVAILABLE_TYPES as $type) {
+        foreach (Thumb::AVAILABLE_HANDLERS as $type) {
             $db->exec('INSERT OR IGNORE INTO types VALUES (NULL, \''. $type .'\')');
         }
     }
@@ -61,9 +59,9 @@ type TEXT UNIQUE);');
         if (!$this->conn) {
             return;
         }
-        if (!$this->ins_stmt) {
+        if (!isset($this->ins_stmt)) {
             $this->ins_stmt = $this->conn->prepare(
-'INSERT OR REPLACE INTO archives VALUES (:id, :typeid, :err, :ver);');
+'INSERT OR REPLACE INTO archives VALUES (:id, :typeid, :err, :hand);');
         }
         $stmt = $this->ins_stmt;
         $stmt->reset();
@@ -77,10 +75,7 @@ type TEXT UNIQUE);');
         }
         $stmt->bindValue(':typeid', $typeid, SQLITE3_INTEGER);
         $stmt->bindValue(':err', $error, SQLITE3_INTEGER);
-        $stmt->bindValue(':ver', $this->version, SQLITE3_INTEGER);
-//         $stmt = 'INSERT OR REPLACE INTO archives VALUES
-// (\''. $hash . '\',\'' . $error . '\',\'' . $this->version . '\')';
-        // $this->conn->exec($stmt);
+        $stmt->bindValue(':hand', $this->version, SQLITE3_INTEGER);
         $stmt->execute();
     }
 
@@ -88,13 +83,13 @@ type TEXT UNIQUE);');
         if (!$this->conn) {
             return [];
         }
-        if (!$this->sel_stmt) {
+        if (!isset($this->sel_stmt)) {
             $this->sel_stmt = $this->conn->prepare(
                 // 'SELECT version, type FROM archives WHERE hashedp = :id;');
-                'SELECT archives.version, types.type
-FROM archives, types
-WHERE hashedp = :id
-and archives.typeid = types.id;');
+                'SELECT archives.handlers, types.type
+ FROM archives, types
+ WHERE hashedp = :id
+ and archives.typeid = types.id;');
         }
         $stmt = $this->sel_stmt;
         $stmt->reset();
@@ -108,23 +103,24 @@ and archives.typeid = types.id;');
 
         // DEBUG
         if ($row) {
-            Util::write_log("FOUND ROW for $hash: ". print_r($row, true));
+            Util::write_log("DB FOUND ROW for $hash: type: ". $row['type']);
+            return $row;
         } else {
-            Util::write_log("NO ROW for $hash");
+            Util::write_log("DB NO ROW for $hash");
+            return null;
         }
-        return $row;
     }
 
-    public function updated_handlers($row) {
+    public function updated_handlers($version) {
         /* Return if the handlers have been updated since last failure check. */
-        Util::write_log("DUMP version: " . $row['version']);
-        return $this->version !== $row['version'];
+        return $this->version !== $version;
     }
 
     public function setup_version() {
-        /* Returns an integer representing the available archive handlers
+        /* Returns an integer representing the available file handlers
            at the time of failure. */
         $hash = 0;
+        // FIXME add more (fileinfo? ffmpeg?)
         $hash |= $this->setup->get('HAS_PHP_ZIP') ? 0b0001 : 0;
         $hash |= $this->setup->get('HAS_PHP_RAR') ? 0b0010 : 0;
         $this->version = $hash;

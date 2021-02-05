@@ -8,8 +8,6 @@ class Util {
     const ERR_UNSUPPORTED = 'ERR_UNSUPPORTED';
     const NO_DEFAULT = 'NO_*@+#?!_DEFAULT';
     const RE_DELIMITER = '@';
-    // 'file' has to be the last item!
-    public const AVAILABLE_TYPES = ['img', 'mov', 'doc', 'swf', 'ar-zip', 'ar-rar', 'file'];
 
     public static function normalize_path($path, $trailing_slash = false) {
         $path = preg_replace('#[\\\\/]+#', '/', $path);
@@ -127,42 +125,6 @@ class Util {
         //return mime_content_type($filename);
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         return $finfo->file($source_path);
-    }
-
-    public static function mime_to_handler_type($mime) {
-        if (strpos($mime, 'image') !== false) {
-            return 'img';
-        }
-        if (strpos($mime, 'video') !== false) {
-            return 'mov';
-        }
-        if (strpos($mime, 'pdf') !== false) {
-            return 'doc';
-        }
-        if (strpos($mime, 'flash') !== false) {
-            return 'swf';
-        }
-        if (strpos($mime, 'zip') !== false) {
-            return 'ar-zip';
-        }
-        if (strpos($mime, 'cbz') !== false) {
-            return 'ar-zip';
-        }
-        if (strpos($mime, 'rar') !== false) {
-            return 'ar-rar';
-        }
-        return 'file';
-    }
-
-    public static function get_types_array($type) {
-        /* Return an array of possible types, with $type as the first element. */
-        $types = Util::AVAILABLE_TYPES;
-        $key = array_search($type, $types);
-        if ($key !== false) {
-            unset($types[$key]);
-            array_unshift($types, $type);
-        }
-        return $types;
     }
     
     public static function write_log($log_msg, $log_filename = "/ssd_data/shared/_h5ai/private") {

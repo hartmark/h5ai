@@ -15,6 +15,7 @@ class Context {
     private $setup;
     private $options;
     private $passhash;
+    private $types;
 
     public function __construct($session, $request, $setup) {
         $this->session = $session;
@@ -49,7 +50,10 @@ class Context {
     }
 
     public function get_types() {
-        return Json::load($this->setup->get('CONF_PATH') . '/types.json');
+        if (!isset($this->types)) {
+            $this->types = Json::load($this->setup->get('CONF_PATH') . '/types.json');
+        }
+        return $this->types;
     }
 
     public function login_admin($pass) {
@@ -265,6 +269,8 @@ class Context {
             $path = $this->to_path($req['href']);
             if (!array_key_exists($path, $thumbs)) {
                 $thumbs[$path] = new Thumb($this, $path, $req['type'], $db);
+                $test = $thumbs[$path];
+                $this->write_log("Initial Handler for $path of type ". $req['type'] ." is ". $test->type->handler);
             }
             else if ($thumbs[$path]->type->name === 'file') {
                 // File has already been mime tested and cannot have a thumbnail
@@ -278,7 +284,7 @@ class Context {
             if ($thumbs[$path]->type->was_wrong()) {
                 $filetypes[] = $thumbs[$path]->type->name;
             } else {
-                $filetypes[] = null;
+                $filetypes[] = null; // No update needed.
             }
         }
         return [$hrefs, $filetypes];
