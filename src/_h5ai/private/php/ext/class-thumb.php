@@ -19,6 +19,7 @@ class Thumb {
         'doc' => ['x-ps', 'x-pdf'],
         'ar-zip' => ['ar', 'ar-zip', 'ar-cbr'],
         'ar-rar' => ['ar-rar'],
+        // 'file' => ['file']
     );
 
     private $context;
@@ -159,6 +160,7 @@ class Thumb {
                 }
                 //       IMAGETYPE_SWF      IMAGETYPE_SWC
                 else if ($exiftype === 4 || $exiftype === 13) {
+                    $this->type->name = 'vid-swf';
                     return $this->capture('swf');
                 }
             }

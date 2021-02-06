@@ -234,9 +234,8 @@ Session.prototype = {
 
 const register = (types, load, adjust) => {
     const initItem = item => {
-        console.log(`initItem(${item.label} with type ${item.type})`);
         if (item.$view && includes(types, item.type)) {
-            item.$view.find('a').on('click', ev => {
+            const onclick = ev => {
                 ev.preventDefault();
 
                 const matchedItems = compact(dom('#items .item').map(el => {
@@ -246,7 +245,17 @@ const register = (types, load, adjust) => {
 
                 session = Session(matchedItems, matchedItems.indexOf(item), load, adjust);
                 enter();
-            });
+            }
+
+            if (item.click_callback) {
+                item.$view.find('a').off('click', item.click_callback);
+            }
+            item.click_callback = onclick;
+            item.click_callback.type = item.type;
+            item.$view.find('a').on('click', onclick);
+        }
+        else if (item.$view && item.click_callback && includes(types, item.click_callback.type)) {
+            item.$view.find('a').off('click', item.click_callback);
         }
     };
 

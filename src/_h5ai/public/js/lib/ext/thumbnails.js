@@ -47,8 +47,8 @@ const queueItem = (queue, item) => {
                 }
             },
             callback_type: filetype => {
-                console.log(`Updating type for ${item.absHref}: ${filetype}`)
                 if (filetype && item.$view) {
+                    console.log(`Updating type for ${item.absHref}: ${item.type}->${filetype}`)
                     item.type = filetype;
                     event.pub('item.changed', item);
                 }
