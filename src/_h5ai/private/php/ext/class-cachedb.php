@@ -120,9 +120,13 @@ type TEXT UNIQUE);');
         /* Returns an integer representing the available file handlers
            at the time of failure. */
         $hash = 0;
-        // FIXME add more (fileinfo? ffmpeg?)
         $hash |= $this->setup->get('HAS_PHP_ZIP') ? 0b0001 : 0;
         $hash |= $this->setup->get('HAS_PHP_RAR') ? 0b0010 : 0;
+        $hash |= $this->setup->get('HAS_PHP_FILEINFO') ? 0b0100 : 0;
+        $hash |= ($this->setup->get('HAS_CMD_FFMPEG')
+               || $this->setup->get('HAS_CMD_AVCONV')) ? 0b1000 : 0;
+        $hash |= ($this->setup->get('HAS_CMD_GM')
+               || $this->setup->get('HAS_CMD_CONVERT')) ? 0b10000 : 0;
         $this->version = $hash;
         return $hash;
     }
