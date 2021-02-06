@@ -10,16 +10,15 @@ class Thumb {
     const THUMB_CACHE = 'thumbs';
     const IMG_EXT = ['jpg', 'jpe', 'jpeg', 'jp2', 'jpx', 'tiff', 'webp', 'ico', 'png', 'bmp', 'gif'];
 
-    // 'file' has to be the last item!
-    public const AVAILABLE_HANDLERS = ['img', 'mov', 'doc', 'swf', 'ar-zip', 'ar-rar', 'file'];
+    // 'file' always has to be the last key tested in fallback logic
     public const HANDLED_TYPES = array(
         'img' => ['img', 'img-bmp', 'img-jpg', 'img-gif', 'img-png', 'img-raw', 'img-tiff', 'img-svg'],
         'mov' => ['vid-mp4', 'vid-webm', 'vid-rm', 'vid-mpg', 'vid-avi', 'vid-mkv', 'vid-mov'],
-        'swf' => ['vid-swf', 'vid-flv'],
         'doc' => ['x-ps', 'x-pdf'],
+        'swf' => ['vid-swf', 'vid-flv'],
         'ar-zip' => ['ar', 'ar-zip', 'ar-cbr'],
         'ar-rar' => ['ar-rar'],
-        // 'file' => ['file']
+        'file' => ['file']
     );
 
     private $context;
@@ -89,6 +88,7 @@ class Thumb {
             return $this->thumb_href($width, $height);
         }
 
+        $this->type->handler = self::type_to_handler($name);
         $handlers = self::get_handlers_array($this->type->handler);
         $thumb_href = null;
 
@@ -127,7 +127,7 @@ class Thumb {
     }
 
     private function capture($handler) {
-        if ($this->attempt >= count(self::AVAILABLE_HANDLERS)) {
+        if ($this->attempt >= count(array_keys(self::HANDLED_TYPES))) {
             return false;
         }
         ++$this->attempt;
@@ -136,7 +136,7 @@ class Thumb {
             if ($this->setup->get('HAS_PHP_FILEINFO')) {
                 $type = $this->type->mime_to_type(
                     Util::get_mimetype($this->source_path));
-                $handler = $this->type->type_to_handler($type);
+                $handler = self::type_to_handler($type);
 
                 Util::write_log("Fileinfo detected for $this->source_path is $type handler $handler");
                 $this->type->name = $type;  // map to type from types.json
@@ -421,13 +421,23 @@ class Thumb {
 
     public static function get_handlers_array($type) {
         /* Return an array of possible types, with $type as the first element. */
-        $types = self::AVAILABLE_HANDLERS;
+        $types = array_keys(self::HANDLED_TYPES);
         $key = array_search($type, $types);
         if ($key !== false) {
             unset($types[$key]);
             array_unshift($types, $type);
         }
         return $types;
+    }
+
+    public static function type_to_handler($type) {
+        foreach(array_keys(self::HANDLED_TYPES) as $key) {
+            if (array_search($type,
+                    self::HANDLED_TYPES[$key]) !== false) {
+                return $key;
+            }
+        }
+        return 'file';
     }
 }
 
@@ -588,13 +598,12 @@ class FileType {
     private $name;
     private $has_changed;
     private $context;
-    public $handler;
+    public $handler;  // public means it is not affected by __set()
 
     public function __construct($context, $name = null) {
         $this->name = $name;
         $this->context = $context;
         $this->has_changed = false;
-        $this->handler = $this->type_to_handler($name);
     }
 
     public function __get($property) {
@@ -615,16 +624,6 @@ class FileType {
 
 	public function was_wrong() {
 		return $this->has_changed;
-    }
-
-    public function type_to_handler($type) {
-        foreach(array_keys(Thumb::HANDLED_TYPES) as $key) {
-            if (array_search($type,
-                    Thumb::HANDLED_TYPES[$key]) !== false) {
-                return $key;
-            }
-        }
-        return 'file';
     }
 
     public function mime_to_type($mime) {
