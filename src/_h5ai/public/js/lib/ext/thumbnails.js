@@ -5,12 +5,11 @@ const allsettings = require('../core/settings');
 
 const defaults = {
     enabled: false,
-    img: ['img-bmp', 'img-gif', 'img-ico', 'img-jpg', 'img-png'],
-    mov: ['vid-avi', 'vid-mkv', 'vid-flv', 'vid-swf', 'vid-mov', 'vid-mp4', 'vid-mpg', 'vid-webm'],
+    img: ['img-bmp', 'img-gif', 'img-ico', 'img-jpg', 'img-png', 'img-svg', 'img-tiff'],
+    mov: ['vid-avi', 'vid-mkv', 'vid-flv', 'vid-swf', 'vid-mov', 'vid-mp4', 'vid-mpg', 'vid-webm', 'vid-wmv', 'vid-ts'],
     doc: ['x-pdf', 'x-ps'],
     ar: ['ar-zip', 'ar-rar'],
     delay: 1,
-    size: 100,
     exif: false,
     chunksize: 20,
     blocklist: [],
@@ -48,7 +47,7 @@ const queueItem = (queue, item) => {
             },
             callback_type: filetype => {
                 if (filetype && item.$view) {
-                    console.log(`Updating type for ${item.label}: ${item.type}->${filetype}`)
+                    console.log(`Updated type for ${item.label}: ${item.type}->${filetype}`);
                     item.type = filetype;
                     event.pub('item.changed', item);
                 }

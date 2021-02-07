@@ -123,7 +123,7 @@ const addTests = () => {
     );
 
     addTest(
-        'Movie thumbs', 'Command line program <code>avconv</code> or <code>ffmpeg</code> available',
+        'Video thumbs', 'Command line program <code>avconv</code> or <code>ffmpeg</code> available',
         setup.HAS_CMD_AVCONV || setup.HAS_CMD_FFMPEG
     );
 
@@ -138,13 +138,8 @@ const addTests = () => {
     );
 
     addTest(
-        'Shell unzip', 'Command line program <code>unzip</code> available',
-        setup.HAS_CMD_UNZIP
-    );
-
-    addTest(
-        'Shell unrar', 'Command line program <code>unrar</code> available',
-        setup.HAS_CMD_UNRAR
+        'Shell zip', 'Command line program <code>zip</code> available',
+        setup.HAS_CMD_ZIP
     );
 
     addTest(

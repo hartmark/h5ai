@@ -192,7 +192,7 @@ class Context {
         $cache = [];
         $folder = Item::get($this, $this->to_path($href), $cache);
 
-        // add content of subfolders
+        // Add content of subfolders.
         if ($what >= 2 && $folder !== null) {
             foreach ($folder->get_content($cache) as $item) {
                 $item->get_content($cache);
@@ -200,7 +200,7 @@ class Context {
             $folder = $folder->get_parent($cache);
         }
 
-        // add content of this folder and all parent folders
+        // Add content of this folder and all parent folders.
         while ($what >= 1 && $folder !== null) {
             $folder->get_content($cache);
             $folder = $folder->get_parent($cache);
@@ -259,9 +259,9 @@ class Context {
 
         $db = new CacheDB($this->setup);
 
-        // FIXME the client is still free to choose what is blocked or not!
         foreach ($requests as $req) {
             if ($req['type'] === 'blocked') {
+                // FIXME the client is still free to choose what is blocked or not.
                 $hrefs[] = null;
                 $filetypes[] = null;
                 continue;
@@ -269,29 +269,24 @@ class Context {
             $path = $this->to_path($req['href']);
             if (!array_key_exists($path, $thumbs)) {
                 $thumbs[$path] = new Thumb($this, $path, $req['type'], $db);
-                $test = $thumbs[$path];
-                $this->write_log("Initial Handler for $path of type ". $req['type'] ." is ". $test->type->handler);
             }
             else if ($thumbs[$path]->type->name === 'file') {
                 // File has already been mime tested and cannot have a thumbnail
-                // This is a security measure, as it only really applies if we
-                // request the same path again in the same request
+                // Only applies if we request the same path again in the same request (security measure)
                 $hrefs[] = null;
                 $filetypes[] = 'file';
                 continue;
             }
+
             $hrefs[] = $thumbs[$path]->thumb($width, $height);
+
             if ($thumbs[$path]->type->was_wrong()) {
                 $filetypes[] = $thumbs[$path]->type->name;
             } else {
-                $filetypes[] = null; // No update needed.
+                $filetypes[] = null; // No client-side update needed.
             }
         }
         return [$hrefs, $filetypes];
-    }
-
-    public function write_log($msg){
-        Util::write_log($msg, $this->setup->get('PRIVATE_PATH'));
     }
 
     private function prefix_x_head_href($href) {

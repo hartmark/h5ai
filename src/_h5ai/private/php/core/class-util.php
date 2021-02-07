@@ -126,15 +126,8 @@ class Util {
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         return $finfo->file($source_path);
     }
-    
-    public static function write_log($log_msg, $log_filename = "/ssd_data/shared/_h5ai/private") {
-        if (!file_exists($log_filename))
-        {
-            mkdir($log_filename, 0777, true);
-        }
-        $log_file_data = $log_filename.'/debug.log';
-        $log_msg = date('Y-m-d H:i:s')." ".$log_msg;
-        file_put_contents($log_file_data, $log_msg . PHP_EOL, FILE_APPEND);
-        chmod($log_file_data, 0777);
+
+    public static function log($log_msg, $filename = __DIR__."/../../cache/debug.log") {
+        file_put_contents($filename, date('Y-m-d H:i:s')." ". $log_msg . PHP_EOL, FILE_APPEND);
     }
 }

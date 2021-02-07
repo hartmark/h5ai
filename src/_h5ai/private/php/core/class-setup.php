@@ -138,7 +138,7 @@ class Setup {
                 $cmd = 'where';
             }
 
-            foreach (['avconv', 'avprobe', 'convert', 'du', 'ffmpeg', 'ffprobe', 'gm', 'tar'] as $c) {
+            foreach (['avconv', 'avprobe', 'convert', 'du', 'ffmpeg', 'ffprobe', 'gm', 'tar', 'zip'] as $c) {
                 $cmds[$c] = ($cmd !== false) && (Util::exec_0($cmd . ' ' . $c) || Util::exec_0($cmd . ' ' . $c . '.exe'));
             }
 
@@ -182,7 +182,8 @@ class Setup {
                 'HAS_CMD_DU',
                 'HAS_CMD_FFMPEG',
                 'HAS_CMD_GM',
-                'HAS_CMD_TAR'
+                'HAS_CMD_TAR',
+                'HAS_CMD_ZIP'
             ]);
         }
 
