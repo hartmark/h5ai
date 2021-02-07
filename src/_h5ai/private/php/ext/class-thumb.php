@@ -10,7 +10,7 @@ class Thumb {
     const THUMB_CACHE = 'thumbs';
     const IMG_EXT = ['jpg', 'jpe', 'jpeg', 'jp2', 'jpx', 'tiff', 'webp', 'ico', 'png', 'bmp', 'gif'];
 
-    // 'file' always has to be the last key tested in fallback logic
+    // 'file' has to be the last key tested in fallback logic.
     public const HANDLED_TYPES = array(
         'img' => ['img', 'img-bmp', 'img-jpg', 'img-gif', 'img-png', 'img-raw', 'img-tiff', 'img-svg'],
         'mov' => ['vid-mp4', 'vid-webm', 'vid-rm', 'vid-mpg', 'vid-avi', 'vid-mkv', 'vid-mov'],
@@ -88,7 +88,7 @@ class Thumb {
             return $this->thumb_href($width, $height);
         }
 
-        $this->type->handler = self::type_to_handler($name);
+        $this->type->handler = self::type_to_handler($this->type->name);
         $handlers = self::get_handlers_array($this->type->handler);
         $thumb_href = null;
 
@@ -105,15 +105,22 @@ class Thumb {
             $thumb_href = $this->thumb_href($width, $height);
             if (!is_null($thumb_href)) {
                 if ($this->type->was_wrong()) {
+                    Util::write_log("Type was wrong for $this->source_path now ". $this->type->name);
                     $this->db->insert($this->source_hash, $this->type->name);
                 }
                 return $thumb_href;
+            } else if (!$this->type->was_wrong()) {
+                Util::write_log("Type was NOT wrong for $this->source_path now ". $this->type->name ." but NO THUMB");
+                break;
             }
         }
         return $thumb_href;
     }
 
     private function thumb_href($width, $height) {
+        if (!isset($this->image)) {
+            return null;
+        }
         $this->image->thumb($width, $height);
         $this->image->save_dest_jpeg($this->thumb_path, 80);
 
@@ -228,13 +235,13 @@ class Thumb {
                 // Cache failure result to avoid scanning again in the future
                 $this->db->insert($this->source_hash, $this->type->name, $e->getCode());
                 // Stop trying to guess the type
-                $this->type->name = 'file';
-                return false;
+                return true;
             } catch (WrongType $e) {
                 Util::write_log("WrongType for $this->source_path: ". $e->getMessage() . PHP_EOL);
                 return $this->capture('file');
-            } catch (Exception $e) { // Probably shouldn't cache this one
-                $this->type->name = 'file';
+            } catch (Exception $e) {
+                // Probably shouldn't cache these errors, they might be temporary
+                // $this->type->name = 'file';
             }
         }
         return false;
@@ -247,7 +254,7 @@ class Thumb {
         }
         $success = $this->do_capture_img($extracted);
         if (!$success){
-            throw new UnhandledArchive("Failed processing selected file from archive.", 2);
+            throw new UnhandledArchive("Failed processing selected thumbnail candidate from archive.", 2);
         }
         return $success;
     }
@@ -419,15 +426,23 @@ class Thumb {
         );
     }
 
-    public static function get_handlers_array($type) {
+    public static function get_handlers_array($handler) {
         /* Return an array of possible types, with $type as the first element. */
-        $types = array_keys(self::HANDLED_TYPES);
-        $key = array_search($type, $types);
-        if ($key !== false) {
-            unset($types[$key]);
-            array_unshift($types, $type);
+        $available = array_keys(self::HANDLED_TYPES);
+
+        // $key = array_search($handler, $available);
+        // if ($key !== false) {
+        //     unset($available[$key]);
+        //     array_unshift($available, $handler);
+        // }
+
+        $handlers[] = $handler;
+        foreach($available as $item) {
+            if ($item === $handler)
+                continue;
+            $handlers[] = $item;
         }
-        return $types;
+        return $handlers;
     }
 
     public static function type_to_handler($type) {

@@ -50,8 +50,10 @@ class CacheDB {
 (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 type TEXT UNIQUE);');
 
-        foreach (Thumb::AVAILABLE_HANDLERS as $type) {
-            $db->exec('INSERT OR IGNORE INTO types VALUES (NULL, \''. $type .'\')');
+        foreach (Thumb::HANDLED_TYPES as $key => $array) {
+            foreach($array as $type) {
+                $db->exec('INSERT OR IGNORE INTO types VALUES (NULL, \''. $type .'\')');
+            }
         }
     }
 
