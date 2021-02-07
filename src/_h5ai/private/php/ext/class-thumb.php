@@ -36,6 +36,7 @@ class Thumb {
         $this->thumbs_path = $this->setup->get('CACHE_PUB_PATH') . '/' . self::THUMB_CACHE;
         $this->thumbs_href = $this->setup->get('CACHE_PUB_HREF') . self::THUMB_CACHE;
         $this->source_path = $source_path;
+        $this->mtime = filemtime($this->source_path);
         // TODO parse the path for file extension here, like the client does
         $this->type = new FileType($context, $type);
         $this->source_hash = sha1($source_path);
@@ -64,7 +65,7 @@ class Thumb {
         $this->thumb_path = $this->thumbs_path . '/' . $name;
         $this->thumb_href = $this->thumbs_href . '/' . $name;
 
-        if (file_exists($this->thumb_path) && filemtime($this->source_path) <= filemtime($this->thumb_path)) {
+        if (file_exists($this->thumb_path) && $this->mtime <= filemtime($this->thumb_path)) {
             $row = $this->db->get_entry($this->source_hash);
             if ($row) {
                 // Notify the client that we know their type detection was wrong,
@@ -76,8 +77,8 @@ class Thumb {
 
         // We have a cached handled failure, skip it
         $row = $this->db->get_entry($this->source_hash);
-        if ($row && !$this->db->updated_handlers($row['handlers'])) {
-            Util::write_log("CACHED TYPE: \"". $row['type'] ."\" for ". $this->source_path . " hash: " . $this->source_hash . PHP_EOL);
+        if ($row && !$this->db->obsolete_entry($row, $this->mtime)) {
+            Util::write_log("CACHED TYPE: \"". $row['type'] ."\" for ". $this->source_path . " hash: " . $this->source_hash . " time diff: ". strval($row['tstamp'] - $this->mtime));
             return null;
         } else {
             Util::write_log("CONTINUE for " . $this->source_path . " hash: " . $this->source_hash . " of maybe type: ". $this->type->name);

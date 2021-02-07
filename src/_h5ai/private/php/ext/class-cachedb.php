@@ -38,6 +38,7 @@ class CacheDB {
  typeid INTEGER,
  error INTEGER,
  handlers INTEGER,
+ tstamp INTEGER,
  FOREIGN KEY(typeid) REFERENCES types(id)
  ) WITHOUT ROWID;');
         // FIXME DEBUG
@@ -63,7 +64,7 @@ type TEXT UNIQUE);');
         }
         if (!isset($this->ins_stmt)) {
             $this->ins_stmt = $this->conn->prepare(
-'INSERT OR REPLACE INTO archives VALUES (:id, :typeid, :err, :hand);');
+'INSERT OR REPLACE INTO archives VALUES (:id, :typeid, :err, :hand, :time);');
         }
         $stmt = $this->ins_stmt;
         $stmt->reset();
@@ -71,13 +72,14 @@ type TEXT UNIQUE);');
 
         $typeid = $this->conn->querySingle('SELECT id FROM types WHERE type = \''. $type .'\';');
         if (!$typeid) {
-            Util::write_log("Inserting new type: $type");
+            Util::write_log("DB inserting new type: $type");
             $this->conn->exec('INSERT INTO types VALUES (NULL, \''. $type .'\')');
             $typeid = $this->conn->querySingle('SELECT id FROM types WHERE type = \''. $type .'\';');
         }
         $stmt->bindValue(':typeid', $typeid, SQLITE3_INTEGER);
         $stmt->bindValue(':err', $error, SQLITE3_INTEGER);
         $stmt->bindValue(':hand', $this->version, SQLITE3_INTEGER);
+        $stmt->bindvalue(':time', time(), SQLITE3_INTEGER);
         $stmt->execute();
     }
 
@@ -88,7 +90,7 @@ type TEXT UNIQUE);');
         if (!isset($this->sel_stmt)) {
             $this->sel_stmt = $this->conn->prepare(
                 // 'SELECT version, type FROM archives WHERE hashedp = :id;');
-                'SELECT archives.handlers, types.type
+                'SELECT archives.handlers, archives.tstamp, types.type
  FROM archives, types
  WHERE hashedp = :id
  and archives.typeid = types.id;');
@@ -105,7 +107,7 @@ type TEXT UNIQUE);');
 
         // DEBUG
         if ($row) {
-            Util::write_log("DB FOUND ROW for $hash: type: ". $row['type']);
+            Util::write_log("DB FOUND ROW for $hash: type: ". $row['type']. " time: ". $row['tstamp']);
             return $row;
         } else {
             Util::write_log("DB NO ROW for $hash");
@@ -113,9 +115,9 @@ type TEXT UNIQUE);');
         }
     }
 
-    public function updated_handlers($version) {
+    public function obsolete_entry($row, $mtime) {
         /* Return if the handlers have been updated since last failure check. */
-        return $this->version !== $version;
+        return ($mtime > $row['tstamp']) || ($this->version !== $row['handlers']);
     }
 
     public function setup_version() {
