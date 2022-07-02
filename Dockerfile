@@ -12,8 +12,16 @@ FROM php:8.1.7-apache-buster
 
 RUN apt update && apt install -y --no-install-recommends \
   unzip \
-  zip \
-  && rm -rf /var/lib/apt/lists/*
+  zip
+
+RUN apt install -y libpng-dev zip graphicsmagick ffmpeg libpng-dev libjpeg-dev libfreetype6-dev
+#RUN apt install -y php-opcache docker-php-ext-configure
+RUN docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/
+RUN docker-php-ext-install gd
+RUN docker-php-ext-configure exif
+RUN docker-php-ext-install exif
+
+RUN rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/build/_h5ai ./_h5ai
 
