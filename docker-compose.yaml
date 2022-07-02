@@ -1,0 +1,7 @@
+services:
+  h5ai:
+    build: .
+    ports:
+      - "8000:80"
+    volumes:
+      - $HTML_ROOT:/var/www/html/pictures:ro

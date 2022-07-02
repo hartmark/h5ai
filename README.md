@@ -1,3 +1,24 @@
+## Docker
+
+This repository includes datastore-metadata as a git submodule for development/testing.
+
+To build/run a local devevelopment instance:
+
+First use make a copy of .env.sample to .env and edit to the folder you want to expose in h5ai.
+
+```
+docker compose up -d --build
+```
+
+Point your browser to http://localhost:8000
+
+If you need to recreate docker images from scratch run this command:
+```
+docker-compose up --force-recreate --build
+```
+
+* Modifications will only be reflected on container image rebuild.
+
 # h5ai
 
 [![license][license-img]][github] [![web][web-img]][web] [![github][github-img]][github]
