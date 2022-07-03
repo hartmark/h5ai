@@ -1,11 +1,10 @@
-## Docker
+# Docker
 
-This repository includes datastore-metadata as a git submodule for development/testing.
+To run h5ai in docker you need to do the following:
 
-To build/run a local devevelopment instance:
-
-First use make a copy of .env.sample to .env and edit to the folder you want to expose in h5ai.
-
+1. Make a copy of `./.env.sample` to `./.env` and edit to the folder you want to expose in h5ai.
+1. If you want to override the password you just put your hash in `./passhash.txt` otherwise copy `./passhash.txt.sample`
+1. Then to run the docker-container just issue this command:
 ```
 docker compose up -d --build
 ```
@@ -16,8 +15,7 @@ If you need to recreate docker images from scratch run this command:
 ```
 docker-compose up --force-recreate --build
 ```
-
-* Modifications will only be reflected on container image rebuild.
+* Remember: Modifications will only be reflected on container image rebuild.
 
 # h5ai
 

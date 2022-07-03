@@ -4,4 +4,8 @@
 /local/
 /node_modules/
 /npm-debug.log
-.env
+
+# user-overriden values *.sample contains sampla values
+/.env
+/passhash.txt
+
